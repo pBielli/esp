@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ESP8266 · DDNS Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- CRT scanline overlay -->
+  <div class="crt-overlay" aria-hidden="true"></div>
+  <!-- Noise grain -->
+  <canvas id="noise-canvas" aria-hidden="true"></canvas>
+
+  <!-- Connect Screen -->
+  <div id="connect-screen" class="screen active">
+    <div class="connect-inner">
+      <div class="logo-block">
+        <div class="logo-chip">
+          <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+            <rect x="20" y="20" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2"/>
+            <rect x="28" y="28" width="24" height="24" fill="currentColor" opacity="0.15"/>
+            <line x1="20" y1="30" x2="8" y2="30" stroke="currentColor" stroke-width="2"/>
+            <line x1="20" y1="40" x2="8" y2="40" stroke="currentColor" stroke-width="2"/>
+            <line x1="20" y1="50" x2="8" y2="50" stroke="currentColor" stroke-width="2"/>
+            <line x1="60" y1="30" x2="72" y2="30" stroke="currentColor" stroke-width="2"/>
+            <line x1="60" y1="40" x2="72" y2="40" stroke="currentColor" stroke-width="2"/>
+            <line x1="60" y1="50" x2="72" y2="50" stroke="currentColor" stroke-width="2"/>
+            <line x1="30" y1="20" x2="30" y2="8" stroke="currentColor" stroke-width="2"/>
+            <line x1="40" y1="20" x2="40" y2="8" stroke="currentColor" stroke-width="2"/>
+            <line x1="50" y1="20" x2="50" y2="8" stroke="currentColor" stroke-width="2"/>
+            <line x1="30" y1="60" x2="30" y2="72" stroke="currentColor" stroke-width="2"/>
+            <line x1="40" y1="60" x2="40" y2="72" stroke="currentColor" stroke-width="2"/>
+            <line x1="50" y1="60" x2="50" y2="72" stroke="currentColor" stroke-width="2"/>
+            <text x="40" y="45" text-anchor="middle" font-size="10" fill="currentColor" font-family="monospace">8266</text>
+          </svg>
+        </div>
+        <div class="logo-text">
+          <span class="logo-title">DDNS<br>MONITOR</span>
+          <span class="logo-sub">ESP8266 · FIRMWARE INTERFACE</span>
+        </div>
+      </div>
+
+      <form id="connect-form" class="connect-form" autocomplete="off">
+        <div class="field-group">
+          <label class="field-label" for="input-ip">DEVICE IP / HOST</label>
+          <div class="field-row">
+            <span class="field-prefix">//</span>
+            <input id="input-ip" type="text" class="field-input" placeholder="192.168.1.x" autocomplete="off" spellcheck="false"/>
+          </div>
+          <div class="field-hint">e.g. 192.168.1.42 or ddns-checker.local</div>
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="input-pass">ADMIN PASSWORD</label>
+          <div class="field-row">
+            <span class="field-prefix">##</span>
+            <input id="input-pass" type="password" class="field-input" placeholder="admin" autocomplete="new-password"/>
+          </div>
+          <div class="field-hint">Default: admin</div>
+        </div>
+        <button type="submit" class="btn-connect" id="btn-connect">
+          <span class="btn-text">ESTABLISH LINK</span>
+          <span class="btn-arrow">→</span>
+        </button>
+        <div id="connect-error" class="connect-error hidden">
+          <span class="error-icon">✕</span>
+          <span id="connect-error-msg">Connection failed</span>
+        </div>
+      </form>
+
+      <div class="connect-footer">
+        <span class="blink-dot"></span> READY TO CONNECT
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard Screen -->
+  <div id="dashboard-screen" class="screen">
+    <!-- Top bar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="topbar-logo" id="btn-disconnect" title="Disconnect">
+          <svg viewBox="0 0 20 20" width="18" height="18"><rect x="4" y="4" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="4" y1="10" x2="0" y2="10" stroke="currentColor" stroke-width="1.5"/><line x1="20" y1="10" x2="16" y2="10" stroke="currentColor" stroke-width="1.5"/></svg>
+          <span>ESP8266</span>
+        </button>
+        <span class="topbar-sep">/</span>
+        <span class="topbar-host" id="topbar-host">—</span>
+      </div>
+      <div class="topbar-center">
+        <div class="status-pill" id="status-pill">
+          <span class="status-dot"></span>
+          <span id="status-text">OFFLINE</span>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <span class="topbar-time" id="topbar-time">--:--:--</span>
+        <button class="icon-btn" id="btn-refresh" title="Refresh All">
+          <svg viewBox="0 0 20 20" width="16" height="16"><path d="M4 10a6 6 0 1 0 1.2-3.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><polyline points="1,4 4,7 7,4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Nav tabs -->
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="overview">OVERVIEW</button>
+      <button class="tab-btn" data-tab="ddns">DDNS</button>
+      <button class="tab-btn" data-tab="gpio">GPIO</button>
+      <button class="tab-btn" data-tab="led">LED</button>
+      <button class="tab-btn" data-tab="wifi">WIFI</button>
+      <button class="tab-btn" data-tab="tools">TOOLS</button>
+      <button class="tab-btn" data-tab="log">LOG</button>
+    </nav>
+
+    <!-- Tab content -->
+    <main class="tab-content">
+
+      <!-- OVERVIEW -->
+      <section class="tab-pane active" id="tab-overview">
+        <div class="cards-grid">
+          <div class="card card--wide">
+            <div class="card-header">
+              <span class="card-icon">◈</span>
+              <span class="card-title">SYSTEM INFO</span>
+              <span class="card-badge" id="rssi-badge">— dBm</span>
+            </div>
+            <div class="info-grid" id="info-grid">
+              <div class="info-item"><span class="info-label">MAC</span><span class="info-val" id="info-mac">—</span></div>
+              <div class="info-item"><span class="info-label">SSID</span><span class="info-val" id="info-ssid">—</span></div>
+              <div class="info-item"><span class="info-label">RSSI</span><span class="info-val" id="info-rssi">—</span></div>
+              <div class="info-item"><span class="info-label">DDNS IP</span><span class="info-val" id="info-ddns-ip">—</span></div>
+              <div class="info-item"><span class="info-label">LOCAL IP</span><span class="info-val" id="info-local-ip">—</span></div>
+              <div class="info-item"><span class="info-label">UPTIME</span><span class="info-val" id="info-uptime">—</span></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-icon">◷</span>
+              <span class="card-title">DEVICE TIME</span>
+            </div>
+            <div class="big-time" id="device-time">--:--:--</div>
+            <div class="big-date" id="device-date">---- -- --</div>
+          </div>
+
+          <div class="card card--accent" id="ddns-status-card">
+            <div class="card-header">
+              <span class="card-icon">⬡</span>
+              <span class="card-title">DDNS STATUS</span>
+            </div>
+            <div class="ddns-status-display">
+              <div class="ddns-indicator" id="ddns-indicator">
+                <span class="ddns-icon">?</span>
+              </div>
+              <div class="ddns-details">
+                <div class="ddns-row"><span class="ddns-lbl">DOMAIN IP</span><span class="ddns-val" id="ddns-domain-ip">—</span></div>
+                <div class="ddns-row"><span class="ddns-lbl">PUBLIC IP</span><span class="ddns-val" id="ddns-public-ip">—</span></div>
+                <div class="ddns-row"><span class="ddns-lbl">STATE</span><span class="ddns-val" id="ddns-state">UNKNOWN</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- DDNS -->
+      <section class="tab-pane" id="tab-ddns">
+        <div class="cards-grid">
+          <div class="card card--wide">
+            <div class="card-header">
+              <span class="card-icon">⬡</span>
+              <span class="card-title">DDNS CONTROL</span>
+            </div>
+            <div class="action-block">
+              <p class="action-desc">Force an immediate DuckDNS update cycle. The device will push the current public IP to the DDNS provider.</p>
+              <button class="btn-action btn-primary" id="btn-ddns-update">
+                <span>⟳</span> FORCE UPDATE
+              </button>
+              <div class="action-result hidden" id="ddns-update-result"></div>
+            </div>
+          </div>
+
+          <div class="card card--wide">
+            <div class="card-header">
+              <span class="card-icon">◎</span>
+              <span class="card-title">DNS RESOLVER</span>
+            </div>
+            <div class="action-block">
+              <p class="action-desc">Resolve any hostname to its IP address using the device's DNS stack.</p>
+              <div class="inline-form">
+                <input type="text" class="field-input inline-input" id="resolve-host" placeholder="hostname (e.g. google.com)" />
+                <button class="btn-action btn-primary" id="btn-resolve">RESOLVE</button>
+              </div>
+              <div class="action-result hidden" id="resolve-result"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- GPIO -->
+      <section class="tab-pane" id="tab-gpio">
+        <div class="cards-grid">
+          <div class="card card--wide">
+            <div class="card-header">
+              <span class="card-icon">⊞</span>
+              <span class="card-title">GPIO PINS</span>
+              <button class="card-action-btn" id="btn-gpio-refresh">REFRESH</button>
+            </div>
+            <div class="gpio-grid" id="gpio-grid">
+              <div class="gpio-loading">Loading pins…</div>
+            </div>
+          </div>
+
+          <div class="card card--wide">
+            <div class="card-header">
+              <span class="card-icon">⊟</span>
+              <span class="card-title">GPIO CONTROL</span>
+            </div>
+            <div class="gpio-control-form">
+              <div class="form-row">
+                <div class="form-field">
+                  <label class="field-label">PIN</label>
+                  <select class="field-select" id="gpio-pin-sel">
+                    <option value="0">GPIO 0</option>
+                    <option value="2">GPIO 2</option>
+                    <option value="4">GPIO 4</option>
+                    <option value="5">GPIO 5</option>
+                    <option value="12">GPIO 12</option>
+                    <option value="13">GPIO 13</option>
+                    <option value="14">GPIO 14</option>
+                    <option value="15">GPIO 15</option>
+                    <option value="16">GPIO 16</option>
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label class="field-label">MODE</label>
+                  <select class="field-select" id="gpio-mode-sel">
+                    <option value="input">INPUT</option>
+                    <option value="output">OUTPUT</option>
+                  </select>
+                </div>
+                <div class="form-field" id="gpio-value-field">
+                  <label class="field-label">VALUE</label>
+                  <select class="field-select" id="gpio-value-sel">
+                    <option value="1">HIGH (1)</option>
+                    <option value="0">LOW (0)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-row">
+                <button class="btn-action btn-primary" id="btn-gpio-set">SET PIN</button>
+                <button class="btn-action btn-secondary" id="btn-gpio-read">READ PIN</button>
+              </div>
+              <div class="action-result hidden" id="gpio-result"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- LED -->
+      <section class="tab-pane" id="tab-led">
+        <div class="cards-grid">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-icon">◉</span>
+              <span class="card-title">LED STATE</span>
+            </div>
+            <div class="led-visual" id="led-visual">
+              <div class="led-bulb" id="led-bulb"></div>
+              <div class="led-label" id="led-state-label">UNKNOWN</div>
+              <div class="led-pin-label">PIN: <span id="led-pin-display">—</span></div>
+            </div>
+            <div class="led-controls">
+              <button class="btn-action btn-led-on" id="btn-led-on">ON</button>
+              <button class="btn-action btn-led-off" id="btn-led-off">OFF</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-icon">◌</span>
+              <span class="card-title">BLINK</span>
+            </div>
+            <div class="blink-form">
+              <label class="field-label">BLINK COUNT</label>
+              <div class="blink-counter">
+                <button class="counter-btn" id="blink-dec">−</button>
+                <span class="counter-val" id="blink-count">5</span>
+                <button class="counter-btn" id="blink-inc">+</button>
+              </div>
+              <button class="btn-action btn-primary" id="btn-blink">BLINK</button>
+              <div class="action-result hidden" id="blink-result"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-icon">⊕</span>
+              <span class="card-title">CHANGE PIN</span>
+            </div>
+            <div class="action-block">
+              <label class="field-label">LED PIN</label>
+              <select class="field-select" id="led-pin-sel">
+                <option value="0">GPIO 0</option>
+                <option value="2" selected>GPIO 2</option>
+                <option value="4">GPIO 4</option>
+                <option value="5">GPIO 5</option>
+                <option value="12">GPIO 12</option>
+                <option value="13">GPIO 13</option>
+                <option value="14">GPIO 14</option>
+                <option value="15">GPIO 15</option>
+                <option value="16">GPIO 16</option>
+              </select>
+              <button class="btn-action btn-primary" id="btn-led-pin">SAVE PIN</button>
+              <div class="action-result hidden" id="led-pin-result"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- WIFI -->
+      <section class="tab-pane" id="tab-wifi">
+        <div class="cards-grid">
+          <div class="card card--wide">
+            <div class="card-header">
+              <span class="card-icon">⌁</span>
+              <span class="card-title">WIFI CONFIGURATION</span>
+            </div>
+            <div class="wifi-warning">
+              <span class="warning-icon">⚠</span>
+              Changes are saved to EEPROM and take effect on next WiFi reconnect. Ensure credentials are correct before saving.
+            </div>
+            <div class="wifi-form">
+              <div class="form-field">
+                <label class="field-label">SSID</label>
+                <div class="field-row">
+                  <span class="field-prefix">⌁</span>
+                  <input type="text" class="field-input" id="wifi-ssid" placeholder="Network name" />
+                </div>
+              </div>
+              <div class="form-field">
+                <label class="field-label">PASSWORD</label>
+                <div class="field-row">
+                  <span class="field-prefix">##</span>
+                  <input type="password" class="field-input" id="wifi-pswd" placeholder="Network password" />
+                </div>
+              </div>
+              <div class="form-row">
+                <button class="btn-action btn-primary" id="btn-save-ssid">SAVE SSID</button>
+                <button class="btn-action btn-primary" id="btn-save-pswd">SAVE PASSWORD</button>
+              </div>
+              <div class="action-result hidden" id="wifi-result"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TOOLS -->
+      <section class="tab-pane" id="tab-tools">
+        <div class="cards-grid">
+          <div class="card card--wide">
+            <div class="card-header">
+              <span class="card-icon">⟁</span>
+              <span class="card-title">HTTP PROXY (CURL)</span>
+            </div>
+            <div class="action-block">
+              <p class="action-desc">Execute an HTTP GET request through the device. Returns raw text response from the target URL.</p>
+              <div class="inline-form">
+                <input type="text" class="field-input inline-input" id="curl-url" placeholder="https://example.com/api/endpoint" />
+                <button class="btn-action btn-primary" id="btn-curl">FETCH</button>
+              </div>
+              <div class="curl-result hidden" id="curl-result"></div>
+            </div>
+          </div>
+
+          <div class="card card--wide">
+            <div class="card-header">
+              <span class="card-icon">⌦</span>
+              <span class="card-title">API EXPLORER</span>
+            </div>
+            <div class="action-block">
+              <p class="action-desc">Browse all available API endpoints as reported by the device.</p>
+              <button class="btn-action btn-secondary" id="btn-api-help">LOAD ENDPOINTS</button>
+              <div class="api-list hidden" id="api-list"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- LOG -->
+      <section class="tab-pane" id="tab-log">
+        <div class="cards-grid">
+          <div class="card card--full">
+            <div class="card-header">
+              <span class="card-icon">▤</span>
+              <span class="card-title">SYSTEM LOG</span>
+              <span class="card-badge" id="log-count">0 entries</span>
+              <button class="card-action-btn" id="btn-log-refresh">REFRESH</button>
+            </div>
+            <div class="log-container" id="log-container">
+              <div class="log-empty">No log entries loaded. Click REFRESH.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Toast container -->
+    <div class="toast-container" id="toast-container"></div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
