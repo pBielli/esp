@@ -219,7 +219,6 @@ function updateInfoCard(info) {
   setText('info-ddns-ip', info.ddns_ip || '—');
   setText('info-local-ip', info.local_ip || '—');
   setText('info-mdns', info.mdns || '—');
-  console.log('DDNS:', info.ddns, 'Public IP:', info.public_ip);
   setText('info-ddns-host', info.ddns || '—');
   setText('info-uptime',  info.uptime  ? formatUptime(info.uptime) : '—');
   if (info.free_heap != null && info.total_heap > 0) {

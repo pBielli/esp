@@ -118,20 +118,21 @@
 
       <!-- OVERVIEW -->
       <section class="tab-pane active" id="tab-overview">
-        <div class="cards-grid">
-          <div class="card card--wide">
-            <div class="card-header">
-              <span class="card-icon">◈</span>
-              <span class="card-title">SYSTEM INFO</span>
-              <span class="card-badge" id="rssi-badge">— dBm</span>
-            </div>
+        <div class="overview-section">
+          <div class="section-title">SYSTEM</div>
+          <div class="cards-grid">
+            <div class="card card--wide">
+              <div class="card-header">
+                <span class="card-icon">◈</span>
+                <span class="card-title">SYSTEM INFO</span>
+                <span class="card-badge" id="rssi-badge">— dBm</span>
+              </div>
               <div class="info-grid" id="info-grid">
                 <div class="info-item"><span class="info-label">MAC</span><span class="info-val" id="info-mac">—</span></div>
                 <div class="info-item"><span class="info-label">SSID</span><span class="info-val" id="info-ssid">—</span></div>
                 <div class="info-item"><span class="info-label">DDNS IP</span><span class="info-val" id="info-ddns-ip">—</span></div>
                 <div class="info-item"><span class="info-label">LOCAL IP</span><span class="info-val" id="info-local-ip">—</span></div>
                 <div class="info-item"><span class="info-label">mDNS</span><span class="info-val" id="info-mdns">—</span></div>
-                <div class="info-item"><span class="info-label">DDNS HOST</span><span class="info-val" id="info-ddns-host">—</span></div>
                 <div class="info-item info-item--row">
                   <span class="info-label">UPTIME</span>
                   <span class="info-val" id="info-uptime">—</span>
@@ -141,30 +142,37 @@
                   <span class="info-pct" id="info-heap-pct">—</span>
                 </div>
               </div>
-          </div>
-
-          <div class="card">
-            <div class="card-header">
-              <span class="card-icon">◷</span>
-              <span class="card-title">DEVICE TIME</span>
             </div>
-            <div class="big-time" id="device-time">--:--:--</div>
-            <div class="big-date" id="device-date">---- -- --</div>
-          </div>
 
-          <div class="card card--accent" id="ddns-status-card">
-            <div class="card-header">
-              <span class="card-icon">⬡</span>
-              <span class="card-title">DDNS STATUS</span>
-            </div>
-            <div class="ddns-status-display">
-              <div class="ddns-indicator" id="ddns-indicator">
-                <span class="ddns-icon">?</span>
+            <div class="card">
+              <div class="card-header">
+                <span class="card-icon">◷</span>
+                <span class="card-title">DEVICE TIME</span>
               </div>
-              <div class="ddns-details">
-                <div class="ddns-row"><span class="ddns-lbl">DOMAIN IP</span><span class="ddns-val" id="ddns-domain-ip">—</span></div>
-                <div class="ddns-row"><span class="ddns-lbl">PUBLIC IP</span><span class="ddns-val" id="ddns-public-ip">—</span></div>
-                <div class="ddns-row"><span class="ddns-lbl">STATE</span><span class="ddns-val" id="ddns-state">UNKNOWN</span></div>
+              <div class="big-time" id="device-time">--:--:--</div>
+              <div class="big-date" id="device-date">---- -- --</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="overview-section">
+          <div class="section-title">WIFI</div>
+          <div class="cards-grid">
+            <div class="card card--accent" id="ddns-status-card">
+              <div class="card-header">
+                <span class="card-icon">⬡</span>
+                <span class="card-title">DDNS STATUS</span>
+              </div>
+              <div class="ddns-status-display">
+                <div class="ddns-indicator" id="ddns-indicator">
+                  <span class="ddns-icon">?</span>
+                </div>
+                <div class="ddns-details">
+                  <div class="ddns-row"><span class="ddns-lbl">DDNS HOST</span><span class="ddns-val" id="info-ddns-host">—</span></div>
+                  <div class="ddns-row"><span class="ddns-lbl">DOMAIN IP</span><span class="ddns-val" id="ddns-domain-ip">—</span></div>
+                  <div class="ddns-row"><span class="ddns-lbl">PUBLIC IP</span><span class="ddns-val" id="ddns-public-ip">—</span></div>
+                  <div class="ddns-row"><span class="ddns-lbl">STATE</span><span class="ddns-val" id="ddns-state">UNKNOWN</span></div>
+                </div>
               </div>
             </div>
           </div>
