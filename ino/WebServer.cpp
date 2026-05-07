@@ -118,6 +118,7 @@ void setupRoutes() {
     a.add("/api/curl?url=x");
     a.add("/api/gpio/info");
     a.add("/api/gpio/read?pin=X");
+    a.add("/api/gpio/analog/read");
     a.add("/api/gpio/set (POST: pin,mode,value)");
     a.add("/api/led/pin (POST)");
     a.add("/api/led/on");
@@ -224,6 +225,12 @@ void setupRoutes() {
     sendCORS();
     int pin = server.arg("pin").toInt();
     server.send(200, "application/json", gpioRead(pin));
+  });
+
+  addOptions("/api/gpio/analog/read");
+  server.on("/api/gpio/analog/read", []() {
+    sendCORS();
+    server.send(200, "application/json", analogReadPin());
   });
 
   addOptions("/api/gpio/set");

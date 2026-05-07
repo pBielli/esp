@@ -9,5 +9,6 @@ String gpioInfo();
 void ledOn();
 void ledOff();
 void ledBlink(int times);
+String analogReadPin();
 
 #endif

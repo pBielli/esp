@@ -44,6 +44,14 @@ void ledOff() {
   digitalWrite(cfg.led_pin, HIGH);
 }
 
+String analogReadPin() {
+  int val = analogRead(A0);
+  float voltage = val * (3.3f / 1024.0f);
+  char buf[64];
+  snprintf(buf, sizeof(buf), "{\"pin\":\"A0\",\"raw\":%d,\"voltage\":%.2f}", val, voltage);
+  return String(buf);
+}
+
 void ledBlink(int times) {
   for (int i = 0; i < times; i++) {
     digitalWrite(cfg.led_pin, LOW);
