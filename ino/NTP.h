@@ -11,5 +11,6 @@ extern const unsigned long ntpSyncInterval;
 
 void ntpBegin();
 String ntpGetTime();
+time_t ntpGetEpoch();
 
 #endif

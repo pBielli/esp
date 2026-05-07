@@ -47,6 +47,13 @@ void setup() {
   Serial.println(" " + WiFi.localIP().toString());
   logAdd(millis(), "WiFi connected: " + WiFi.localIP().toString());
 
+  if (!cfg.use_static_ip) {
+    IPAddress dns1, dns2;
+    if (dns1.fromString(cfg.static_dns1) || dns2.fromString(cfg.static_dns2)) {
+      WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, dns1, dns2);
+    }
+  }
+
   ntpBegin();
   logAdd(millis(), "Time: " + ntpGetTime());
 

@@ -128,7 +128,9 @@ void setupRoutes() {
     a.add("/api/led/blink");
     a.add("/api/ntp/set (POST: server,tz_offset)");
     a.add("/api/wifi/scan");
-    a.add("/api/ip/config (POST: dhcp,ip,gateway,subnet,dns1,dns2)");
+    a.add("/api/set/mdns (POST)");
+    a.add("/api/dns/set (POST: dns1,dns2)");
+    a.add("/api/ip/config (POST: dhcp,ip,gateway,subnet)");
     a.add("/api/pwm/pin (POST)");
     a.add("/api/set/ssid (POST)");
     a.add("/api/set/pswd (POST)");
@@ -185,7 +187,17 @@ void setupRoutes() {
   addOptions("/api/time");
   server.on("/api/time", []() {
     sendCORS();
-    server.send(200, "application/json", "{\"time\":\"" + ntpGetTime() + "\"}");
+    time_t epoch = ntpGetEpoch();
+    int tz_hours = cfg.tz_offset / 3600;
+    char utc_str[16];
+    snprintf(utc_str, sizeof(utc_str), "UTC%+dh", tz_hours);
+    JsonDocument doc;
+    doc["time"] = ntpGetTime();
+    doc["epoch"] = (long)epoch;
+    doc["tz_offset"] = cfg.tz_offset;
+    doc["utc"] = utc_str;
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
   });
 
   addOptions("/api/log");
@@ -342,6 +354,16 @@ void setupRoutes() {
     server.send(200, "application/json", "{\"status\":\"saved\"}");
   });
 
+  addOptions("/api/set/mdns");
+  server.on("/api/set/mdns", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    String m = server.arg("mdns");
+    if (m == "") { server.send(400, "application/json", "{\"error\":\"Missing mdns\"}"); return; }
+    strncpy(cfg.mdns_name, m.c_str(), 31);
+    storageSave();
+    server.send(200, "application/json", "{\"status\":\"saved\",\"mdns\":\"" + String(cfg.mdns_name) + "\"}");
+  });
+
   addOptions("/api/ntp/set");
   server.on("/api/ntp/set", HTTP_POST, []() {
     if (!checkAuth()) return;
@@ -378,6 +400,17 @@ void setupRoutes() {
     }
   });
 
+  addOptions("/api/dns/set");
+  server.on("/api/dns/set", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    String dns1 = server.arg("dns1");
+    String dns2 = server.arg("dns2");
+    if (dns1 != "") strncpy(cfg.static_dns1, dns1.c_str(), 15);
+    if (dns2 != "") strncpy(cfg.static_dns2, dns2.c_str(), 15);
+    storageSave();
+    server.send(200, "application/json", "{\"status\":\"saved\",\"dns1\":\"" + String(cfg.static_dns1) + "\",\"dns2\":\"" + String(cfg.static_dns2) + "\"}");
+  });
+
   addOptions("/api/ip/config");
   server.on("/api/ip/config", HTTP_POST, []() {
     if (!checkAuth()) return;
@@ -387,13 +420,9 @@ void setupRoutes() {
       String ip = server.arg("ip");
       String gw = server.arg("gateway");
       String subnet = server.arg("subnet");
-      String dns1 = server.arg("dns1");
-      String dns2 = server.arg("dns2");
       if (ip != "") strncpy(cfg.static_ip, ip.c_str(), 15);
       if (gw != "") strncpy(cfg.static_gateway, gw.c_str(), 15);
       if (subnet != "") strncpy(cfg.static_subnet, subnet.c_str(), 15);
-      if (dns1 != "") strncpy(cfg.static_dns1, dns1.c_str(), 15);
-      if (dns2 != "") strncpy(cfg.static_dns2, dns2.c_str(), 15);
     }
     storageSave();
     server.send(200, "application/json", "{\"status\":\"saved\",\"use_static_ip\":" + String(cfg.use_static_ip) + "}");

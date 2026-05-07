@@ -8,8 +8,11 @@ const state = {
   pass: '',
   authHeader: '',
   refreshInterval: null,
-  timeInterval: null,
+  clockInterval: null,
   blinkCount: 5,
+  deviceEpoch: 0,
+  tzOffset: 0,
+  lastTimeSync: 0,
 };
 
 // ── Utils ──────────────────────────────────────────────────
@@ -161,9 +164,9 @@ function hideConnectError() {
 // ── Disconnect ─────────────────────────────────────────────
 $('btn-disconnect').addEventListener('click', () => {
   clearInterval(state.refreshInterval);
-  clearInterval(state.timeInterval);
+  clearInterval(state.clockInterval);
   state.refreshInterval = null;
-  state.timeInterval = null;
+  state.clockInterval = null;
   showScreen('connect-screen');
   toast('Disconnected', 'warning');
 });
@@ -176,24 +179,24 @@ function initDashboard(info) {
   setText('status-text', 'ONLINE');
 
   updateInfoCard(info);
-  loadTime();
   loadGpioInfo();
 
   // Auto-refresh every 30s
   clearInterval(state.refreshInterval);
   state.refreshInterval = setInterval(refreshAll, 30000);
 
-  // Sync clock on load
+  // Initial time sync
   loadTime();
-  // Refresh clock every 10 minutes
-  clearInterval(state.timeInterval);
-  state.timeInterval = setInterval(loadTime, 600000);
+  // Start local clock tick
+  clearInterval(state.clockInterval);
+  state.clockInterval = setInterval(tickClock, 1000);
 }
 
 async function refreshAll() {
   try {
     const info = await apiFetch('/api/info');
     updateInfoCard(info);
+    loadTime();
     toast('Refreshed', 'success', 1500);
   } catch {
     toast('Refresh failed', 'error');
@@ -206,7 +209,20 @@ $('btn-refresh').addEventListener('click', refreshAll);
 
 // ── Info ───────────────────────────────────────────────────
 function updateInfoCard(info) {
+  // SYSTEM card
+  setText('info-mdns',      info.mdns        || '—');
   setText('info-mac',       info.mac         || '—');
+  setText('info-uptime',    info.uptime      ? formatUptime(info.uptime) : '—');
+  if (info.free_heap != null) {
+    const kb = Math.round(info.free_heap / 1024);
+    setText('info-heap-pct', kb + ' KB');
+  } else {
+    setText('info-heap-pct', '—');
+  }
+  setText('info-local-ip',  info.local_ip    || '—');
+  setText('info-ip-mode',   info.use_static_ip ? 'STATIC' : 'DHCP');
+
+  // NETWORK card
   setText('info-ssid',      info.ssid        || '—');
   setText('info-rssi',      info.rssi        ? `${info.rssi} dBm` : '—');
   if (info.rssi != null) {
@@ -215,21 +231,12 @@ function updateInfoCard(info) {
   } else {
     setText('info-rssi-pct', '—');
   }
-  setText('info-ddns-ip',   info.ddns_ip     || '—');
-  setText('info-local-ip',  info.local_ip    || '—');
-  setText('info-mdns',      info.mdns        || '—');
-  setText('info-ddns-host', info.ddns        || '—');
-  setText('info-uptime',    info.uptime      ? formatUptime(info.uptime) : '—');
-  if (info.free_heap != null) {
-    const kb = Math.round(info.free_heap / 1024);
-    setText('info-heap-pct', kb + ' KB');
-  } else {
-    setText('info-heap-pct', '—');
-  }
   setText('info-gateway',   info.gateway     || '—');
   setText('info-subnet',    info.subnet      || '—');
   setText('info-dns1',      info.dns1        || '—');
   setText('info-dns2',      info.dns2        || '—');
+
+  // CONFIG card
   setText('info-ntp-server', info.ntp_server || '—');
   if (info.tz_offset != null) {
     const hours = info.tz_offset / 3600;
@@ -238,10 +245,12 @@ function updateInfoCard(info) {
     setText('info-tz', '—');
   }
   setText('info-led-invert', info.led_invert ? 'YES' : 'NO');
-  setText('info-ip-mode',   info.use_static_ip ? 'STATIC' : 'DHCP');
+  setText('info-led-pin',   info.led_pin != null ? `GPIO ${info.led_pin}` : '—');
   setText('info-pwm-pin',   info.pwm_pin != null ? `GPIO ${info.pwm_pin}` : '—');
 
   // DDNS status comparison
+  setText('info-ddns-ip',   info.ddns_ip     || '—');
+  setText('info-ddns-host', info.ddns        || '—');
   if (info.ddns_ip && info.public_ip) {
     updateDdnsStatus(info.ddns_ip, info.public_ip);
   } else if (info.ddns_ip) {
@@ -277,14 +286,22 @@ function formatUptime(seconds) {
 }
 
 // ── Time ───────────────────────────────────────────────────
+function formatTimeFromEpoch(epoch) {
+  const d = new Date((epoch + state.tzOffset) * 1000);
+  const pad = n => String(n).padStart(2, '0');
+  const time = `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+  const date = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+  return { time, date };
+}
+
 async function loadTime() {
   try {
     const data = await apiFetch('/api/time');
-    const timeStr = data.time || data;
-    if (timeStr && timeStr !== '--') {
-      const parts = timeStr.toString().split(' ');
-      const date = parts[0] || '';
-      const time = parts[1] || timeStr;
+    if (data.epoch && data.tz_offset != null) {
+      state.deviceEpoch = data.epoch;
+      state.tzOffset = data.tz_offset;
+      state.lastTimeSync = Date.now();
+      const { time, date } = formatTimeFromEpoch(data.epoch);
       setText('device-time', time);
       setText('device-date', date);
       setText('topbar-time', time);
@@ -292,6 +309,16 @@ async function loadTime() {
   } catch {
     // Silently fail for time
   }
+}
+
+function tickClock() {
+  if (!state.lastTimeSync || !state.deviceEpoch) return;
+  const elapsed = Math.floor((Date.now() - state.lastTimeSync) / 1000);
+  const current = state.deviceEpoch + elapsed;
+  const { time, date } = formatTimeFromEpoch(current);
+  setText('device-time', time);
+  setText('device-date', date);
+  setText('topbar-time', time);
 }
 
 // ── Tabs ───────────────────────────────────────────────────
@@ -628,8 +655,6 @@ $('btn-ip-save').addEventListener('click', async () => {
     body.append('ip',      $('ip-addr').value.trim());
     body.append('gateway', $('ip-gateway').value.trim());
     body.append('subnet',  $('ip-subnet').value.trim());
-    body.append('dns1',    $('ip-dns1').value.trim());
-    body.append('dns2',    $('ip-dns2').value.trim());
   }
   try {
     const data = await apiFetch('/api/ip/config', { method: 'POST', auth: true, body: body.toString() });
@@ -638,6 +663,39 @@ $('btn-ip-save').addEventListener('click', async () => {
   } catch (err) {
     showResult('ip-result', `Error: ${err.message}`, 'error');
     toast('IP config failed', 'error');
+  }
+});
+
+// ── mDNS Save ──────────────────────────────────────────────
+$('btn-mdns-save').addEventListener('click', async () => {
+  const mdns = $('mdns-name').value.trim();
+  if (!mdns) { toast('Enter an mDNS name', 'warning'); return; }
+  const body = new URLSearchParams({ mdns }).toString();
+  try {
+    const data = await apiFetch('/api/set/mdns', { method: 'POST', auth: true, body });
+    showResult('mdns-result', `mDNS saved: "${data.mdns}". Reboot to apply.`, 'success');
+    toast('mDNS saved', 'success');
+  } catch (err) {
+    showResult('mdns-result', `Error: ${err.message}`, 'error');
+    toast('mDNS save failed', 'error');
+  }
+});
+
+// ── DNS Save ───────────────────────────────────────────────
+$('btn-dns-save').addEventListener('click', async () => {
+  const dns1 = $('dns1').value.trim();
+  const dns2 = $('dns2').value.trim();
+  if (!dns1 && !dns2) { toast('Enter at least one DNS server', 'warning'); return; }
+  const body = new URLSearchParams();
+  if (dns1) body.append('dns1', dns1);
+  if (dns2) body.append('dns2', dns2);
+  try {
+    const data = await apiFetch('/api/dns/set', { method: 'POST', auth: true, body: body.toString() });
+    showResult('dns-result', `DNS saved: ${data.dns1}, ${data.dns2}. Reconnect to apply.`, 'success');
+    toast('DNS saved', 'success');
+  } catch (err) {
+    showResult('dns-result', `Error: ${err.message}`, 'error');
+    toast('DNS save failed', 'error');
   }
 });
 
@@ -747,16 +805,19 @@ async function loadNetworkTab() {
     const info = await apiFetch('/api/info');
     if (info.ntp_server) $('ntp-server').value = info.ntp_server;
     if (info.tz_offset != null) $('ntp-tz').value = info.tz_offset;
+    if (info.mdns) $('mdns-name').value = info.mdns;
+    if (info.static_dns1) $('dns1').value = info.static_dns1;
+    if (info.static_dns2) $('dns2').value = info.static_dns2;
+    if (info.dns1) $('dns1').placeholder = info.dns1;
+    if (info.dns2) $('dns2').placeholder = info.dns2;
     if (info.use_static_ip != null) {
       const isStatic = info.use_static_ip === 1;
       $('ip-mode-toggle').classList.toggle('active', isStatic);
       $('ip-static-fields').style.display = isStatic ? '' : 'none';
     }
     if (info.static_ip) $('ip-addr').value = info.static_ip;
-    if (info.gateway) $('ip-gateway').value = info.gateway;
-    if (info.subnet) $('ip-subnet').value = info.subnet;
-    if (info.dns1) $('ip-dns1').value = info.dns1;
-    if (info.dns2) $('ip-dns2').value = info.dns2;
+    if (info.static_gateway) $('ip-gateway').value = info.static_gateway;
+    if (info.static_subnet) $('ip-subnet').value = info.static_subnet;
     if (info.pwm_pin != null) $('pwm-pin-sel').value = info.pwm_pin;
   } catch {}
 }

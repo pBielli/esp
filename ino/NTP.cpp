@@ -32,3 +32,8 @@ String ntpGetTime() {
           t->tm_hour, t->tm_min, t->tm_sec);
   return String(buf);
 }
+
+time_t ntpGetEpoch() {
+  if (millis() - lastNtpSync > ntpSyncInterval) ntpBegin();
+  return time(nullptr);
+}
