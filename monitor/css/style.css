@@ -465,6 +465,16 @@ body {
 }
 
 .info-item { display: flex; flex-direction: column; gap: 0.2rem; }
+.info-item--row { flex-direction: row; align-items: center; gap: 0.5rem; }
+.info-item--row .info-label { min-width: auto; }
+.info-pct {
+  font-size: 0.75rem;
+  color: var(--green);
+  background: var(--green-dark);
+  padding: 0.1rem 0.4rem;
+  border-radius: 2px;
+  font-family: var(--font-mono);
+}
 
 .info-label {
   font-size: 0.6rem;

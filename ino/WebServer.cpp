@@ -138,6 +138,9 @@ void setupRoutes() {
     doc["rssi"] = WiFi.RSSI();
     doc["mdns"] = cfg.mdns_name;
     doc["ddns"] = cfg.ddns_hostname;
+    doc["uptime"] = millis() / 1000;
+    doc["free_heap"] = ESP.getFreeHeap();
+    doc["total_heap"] = ESP.getHeapSize();
     IPAddress dip;
     if (WiFi.hostByName(cfg.ddns_hostname, dip)) doc["ddns_ip"] = dip.toString();
     String pub = getPublicIP();

@@ -212,6 +212,12 @@ function updateInfoCard(info) {
   setText('info-ddns-ip', info.ddns_ip || '—');
   setText('info-local-ip', info.local_ip || '—');
   setText('info-uptime',  info.uptime  ? formatUptime(info.uptime) : '—');
+  if (info.free_heap != null && info.total_heap > 0) {
+    const pct = Math.round((1 - info.free_heap / info.total_heap) * 100);
+    setText('info-heap-pct', pct + '%');
+  } else {
+    setText('info-heap-pct', '—');
+  }
   setText('rssi-badge',   info.rssi    ? `${info.rssi} dBm` : '—');
 
   // DDNS status comparison
