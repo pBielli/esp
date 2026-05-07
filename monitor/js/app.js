@@ -209,8 +209,17 @@ function updateInfoCard(info) {
   setText('info-mac',     info.mac     || '—');
   setText('info-ssid',    info.ssid    || '—');
   setText('info-rssi',    info.rssi    ? `${info.rssi} dBm` : '—');
+  if (info.rssi != null) {
+    // 0=weak(0%), -100=strong(100%) per user note
+    const rssiPct = Math.max(0, Math.min(100, Math.round(-info.rssi)));
+    setText('info-rssi-pct', rssiPct + '%');
+  } else {
+    setText('info-rssi-pct', '—');
+  }
   setText('info-ddns-ip', info.ddns_ip || '—');
   setText('info-local-ip', info.local_ip || '—');
+  setText('info-mdns', info.mdns || '—');
+  setText('info-ddns-host', info.ddns || '—');
   setText('info-uptime',  info.uptime  ? formatUptime(info.uptime) : '—');
   if (info.free_heap != null && info.total_heap > 0) {
     const pct = Math.round((1 - info.free_heap / info.total_heap) * 100);
