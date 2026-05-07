@@ -227,7 +227,7 @@ function updateInfoCard(info) {
   } else {
     setText('info-heap-pct', '—');
   }
-  setText('rssi-badge',   info.rssi    ? `${info.rssi} dBm` : '—');
+  // setText('rssi-badge',   info.rssi    ? `${info.rssi} dBm` : '—');
 
   // DDNS status comparison
   if (info.ddns_ip && info.public_ip) {
