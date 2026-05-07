@@ -1,13 +1,12 @@
 #include "NTP.h"
+#include "Config.h"
 
 WiFiUDP ntpUdp;
 unsigned long lastNtpSync = 0;
 const unsigned long ntpSyncInterval = 86400000;
-const char* ntpServer = "pool.ntp.org";
-const int timezone = 1;
 
 void ntpBegin() {
-  configTime(timezone * 3600, 0, ntpServer);
+  configTime(cfg.tz_offset, 0, cfg.ntp_server);
   delay(500);
   Serial.print("Syncing NTP");
   for (int i = 0; i < 10; i++) {

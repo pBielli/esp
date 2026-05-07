@@ -16,6 +16,16 @@ struct Config {
   char duckdns_token[48];
   char duckdns_domain[32];
   int led_pin;
+  int tz_offset;
+  char ntp_server[64];
+  int led_invert;
+  int use_static_ip;
+  char static_ip[16];
+  char static_gateway[16];
+  char static_subnet[16];
+  char static_dns1[16];
+  char static_dns2[16];
+  int pwm_pin;
   char magic[4];
 };
 

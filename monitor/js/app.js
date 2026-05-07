@@ -206,28 +206,40 @@ $('btn-refresh').addEventListener('click', refreshAll);
 
 // ── Info ───────────────────────────────────────────────────
 function updateInfoCard(info) {
-  setText('info-mac',     info.mac     || '—');
-  setText('info-ssid',    info.ssid    || '—');
-  setText('info-rssi',    info.rssi    ? `${info.rssi} dBm` : '—');
+  setText('info-mac',       info.mac         || '—');
+  setText('info-ssid',      info.ssid        || '—');
+  setText('info-rssi',      info.rssi        ? `${info.rssi} dBm` : '—');
   if (info.rssi != null) {
-    // 0=weak(0%), -100=strong(100%) per user note
     const rssiPct = Math.max(0, Math.min(100, Math.round(-info.rssi)));
     setText('info-rssi-pct', rssiPct + '%');
   } else {
     setText('info-rssi-pct', '—');
   }
-  setText('info-ddns-ip', info.ddns_ip || '—');
-  setText('info-local-ip', info.local_ip || '—');
-  setText('info-mdns', info.mdns || '—');
-  setText('info-ddns-host', info.ddns || '—');
-  setText('info-uptime',  info.uptime  ? formatUptime(info.uptime) : '—');
+  setText('info-ddns-ip',   info.ddns_ip     || '—');
+  setText('info-local-ip',  info.local_ip    || '—');
+  setText('info-mdns',      info.mdns        || '—');
+  setText('info-ddns-host', info.ddns        || '—');
+  setText('info-uptime',    info.uptime      ? formatUptime(info.uptime) : '—');
   if (info.free_heap != null) {
     const kb = Math.round(info.free_heap / 1024);
     setText('info-heap-pct', kb + ' KB');
   } else {
     setText('info-heap-pct', '—');
   }
-  // setText('rssi-badge',   info.rssi    ? `${info.rssi} dBm` : '—');
+  setText('info-gateway',   info.gateway     || '—');
+  setText('info-subnet',    info.subnet      || '—');
+  setText('info-dns1',      info.dns1        || '—');
+  setText('info-dns2',      info.dns2        || '—');
+  setText('info-ntp-server', info.ntp_server || '—');
+  if (info.tz_offset != null) {
+    const hours = info.tz_offset / 3600;
+    setText('info-tz', `UTC${hours >= 0 ? '+' : ''}${hours}h`);
+  } else {
+    setText('info-tz', '—');
+  }
+  setText('info-led-invert', info.led_invert ? 'YES' : 'NO');
+  setText('info-ip-mode',   info.use_static_ip ? 'STATIC' : 'DHCP');
+  setText('info-pwm-pin',   info.pwm_pin != null ? `GPIO ${info.pwm_pin}` : '—');
 
   // DDNS status comparison
   if (info.ddns_ip && info.public_ip) {
@@ -293,6 +305,8 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     // Lazy-load tab data
     if (btn.dataset.tab === 'gpio') loadGpioInfo();
     if (btn.dataset.tab === 'log') loadLog();
+    if (btn.dataset.tab === 'led') loadLedInvert();
+    if (btn.dataset.tab === 'network') loadNetworkTab();
   });
 });
 
@@ -445,6 +459,188 @@ $('btn-led-pin').addEventListener('click', async () => {
   }
 });
 
+// ── LED Invert ──────────────────────────────────────────────
+async function loadLedInvert() {
+  try {
+    const info = await apiFetch('/api/info');
+    updateLedInvertUI(info.led_invert === 1);
+  } catch {}
+}
+
+function updateLedInvertUI(enabled) {
+  const toggle = $('led-invert-toggle');
+  toggle.classList.toggle('active', enabled);
+}
+
+$('led-invert-toggle').addEventListener('click', async () => {
+  const enabled = $('led-invert-toggle').classList.contains('active') ? 0 : 1;
+  const body = new URLSearchParams({ enabled }).toString();
+  try {
+    await apiFetch('/api/led/invert', { method: 'POST', auth: true, body });
+    updateLedInvertUI(enabled === 1);
+    toast(`LED invert ${enabled ? 'ON' : 'OFF'}`, 'success');
+  } catch (err) {
+    toast(`Invert failed: ${err.message}`, 'error');
+  }
+});
+
+// ── Analog (A0 / PWM) ──────────────────────────────────────
+$('btn-analog-read').addEventListener('click', async () => {
+  try {
+    const data = await apiFetch('/api/gpio/analog/read');
+    setText('analog-read-value', data.value != null ? data.value : data.raw);
+    toast(`A0: ${data.value} / 100`, 'success');
+  } catch (err) {
+    toast(`Analog read failed: ${err.message}`, 'error');
+  }
+});
+
+$('pwm-slider').addEventListener('input', () => {
+  setText('pwm-value-display', $('pwm-slider').value);
+});
+
+$('btn-pwm-write').addEventListener('click', async () => {
+  const pin = $('pwm-pin-sel').value;
+  const value = $('pwm-slider').value;
+  const body = new URLSearchParams({ pin, value }).toString();
+  try {
+    const data = await apiFetch('/api/gpio/analog/write', { method: 'POST', auth: true, body });
+    showResult('analog-result', `PWM GPIO ${data.pin}: ${data.value} (pwm=${data.pwm})`, 'success');
+    toast(`PWM GPIO ${data.pin} = ${data.value}`, 'success');
+  } catch (err) {
+    showResult('analog-result', `Error: ${err.message}`, 'error');
+    toast('PWM write failed', 'error');
+  }
+});
+
+$('btn-pwm-pin-save').addEventListener('click', async () => {
+  const pin = $('pwm-pin-sel').value;
+  const body = new URLSearchParams({ pin }).toString();
+  try {
+    const data = await apiFetch('/api/pwm/pin', { method: 'POST', auth: true, body });
+    showResult('analog-result', `PWM default pin saved: GPIO ${data.pwm_pin}`, 'success');
+    toast(`PWM pin set to GPIO ${data.pwm_pin}`, 'success');
+  } catch (err) {
+    showResult('analog-result', `Error: ${err.message}`, 'error');
+    toast('PWM pin save failed', 'error');
+  }
+});
+
+// ── NTP Tab ──────────────────────────────────────────────────
+$('btn-ntp-save').addEventListener('click', async () => {
+  const server = $('ntp-server').value.trim();
+  const tz_offset = $('ntp-tz').value.trim();
+  if (!server && !tz_offset) { toast('Enter at least one field', 'warning'); return; }
+  const body = new URLSearchParams();
+  if (server) body.append('server', server);
+  if (tz_offset) body.append('tz_offset', tz_offset);
+  try {
+    const data = await apiFetch('/api/ntp/set', { method: 'POST', auth: true, body: body.toString() });
+    showResult('ntp-result', `NTP: ${data.ntp_server}, TZ: ${data.tz_offset}s (UTC${data.tz_offset / 3600 >= 0 ? '+' : ''}${data.tz_offset / 3600}h)`, 'success');
+    toast('NTP config saved', 'success');
+  } catch (err) {
+    showResult('ntp-result', `Error: ${err.message}`, 'error');
+    toast('NTP save failed', 'error');
+  }
+});
+
+// ── WiFi Scan ───────────────────────────────────────────────
+let scanPollInterval = null;
+
+$('btn-wifi-scan').addEventListener('click', async () => {
+  const statusEl = $('scan-status');
+  const resultsEl = $('scan-results');
+  statusEl.textContent = 'Scanning...';
+  statusEl.className = 'scan-status';
+  resultsEl.classList.add('hidden');
+  resultsEl.innerHTML = '';
+
+  try {
+    const data = await apiFetch('/api/wifi/scan', { auth: true });
+    if (data.status === 'scanning') {
+      statusEl.textContent = 'Scan in progress, polling...';
+      if (scanPollInterval) clearInterval(scanPollInterval);
+      scanPollInterval = setInterval(pollScan, 2000);
+    } else if (data.networks) {
+      renderScanResults(data.networks);
+    }
+  } catch (err) {
+    statusEl.textContent = `Scan error: ${err.message}`;
+    statusEl.className = 'scan-status error';
+  }
+});
+
+async function pollScan() {
+  try {
+    const data = await apiFetch('/api/wifi/scan', { auth: true });
+    if (data.networks) {
+      clearInterval(scanPollInterval);
+      scanPollInterval = null;
+      renderScanResults(data.networks);
+    }
+  } catch {
+    clearInterval(scanPollInterval);
+    scanPollInterval = null;
+    $('scan-status').textContent = 'Scan failed';
+    $('scan-status').className = 'scan-status error';
+  }
+}
+
+function renderScanResults(networks) {
+  const statusEl = $('scan-status');
+  const resultsEl = $('scan-results');
+  if (!networks || networks.length === 0) {
+    statusEl.textContent = 'No networks found.';
+    return;
+  }
+  const encLabels = ['Open', 'WEP', 'WPA/PSK', 'WPA2/PSK', 'WPA/WPA2'];
+  statusEl.textContent = `${networks.length} network(s) found.`;
+  statusEl.className = 'scan-status success';
+  resultsEl.innerHTML = '';
+  resultsEl.classList.remove('hidden');
+
+  const table = document.createElement('table');
+  table.className = 'scan-table';
+  table.innerHTML = `<thead><tr><th>SSID</th><th>RSSI</th><th>CH</th><th>ENC</th></tr></thead>`;
+  const tbody = document.createElement('tbody');
+  for (const net of networks) {
+    const row = document.createElement('tr');
+    const enc = encLabels[net.encryption] || `Type ${net.encryption}`;
+    row.innerHTML = `<td>${escapeHtml(net.ssid)}</td><td>${net.rssi} dBm</td><td>${net.channel}</td><td>${enc}</td>`;
+    tbody.appendChild(row);
+  }
+  table.appendChild(tbody);
+  resultsEl.appendChild(table);
+}
+
+// ── IP Config ───────────────────────────────────────────────
+$('ip-mode-toggle').addEventListener('click', () => {
+  const toggle = $('ip-mode-toggle');
+  toggle.classList.toggle('active');
+  const fields = $('ip-static-fields');
+  fields.style.display = toggle.classList.contains('active') ? '' : 'none';
+});
+
+$('btn-ip-save').addEventListener('click', async () => {
+  const isStatic = $('ip-mode-toggle').classList.contains('active');
+  const body = new URLSearchParams({ dhcp: isStatic ? '0' : '1' });
+  if (isStatic) {
+    body.append('ip',      $('ip-addr').value.trim());
+    body.append('gateway', $('ip-gateway').value.trim());
+    body.append('subnet',  $('ip-subnet').value.trim());
+    body.append('dns1',    $('ip-dns1').value.trim());
+    body.append('dns2',    $('ip-dns2').value.trim());
+  }
+  try {
+    const data = await apiFetch('/api/ip/config', { method: 'POST', auth: true, body: body.toString() });
+    showResult('ip-result', `IP config saved: ${data.use_static_ip ? 'STATIC' : 'DHCP'}. Reconnect to apply.`, 'success');
+    toast('IP config saved', 'success');
+  } catch (err) {
+    showResult('ip-result', `Error: ${err.message}`, 'error');
+    toast('IP config failed', 'error');
+  }
+});
+
 // ── WiFi Tab ───────────────────────────────────────────────
 $('btn-save-ssid').addEventListener('click', async () => {
   const ssid = $('wifi-ssid').value.trim();
@@ -544,6 +740,26 @@ async function loadLog() {
 }
 
 $('btn-log-refresh').addEventListener('click', loadLog);
+
+// ── Network Tab Init ────────────────────────────────────────
+async function loadNetworkTab() {
+  try {
+    const info = await apiFetch('/api/info');
+    if (info.ntp_server) $('ntp-server').value = info.ntp_server;
+    if (info.tz_offset != null) $('ntp-tz').value = info.tz_offset;
+    if (info.use_static_ip != null) {
+      const isStatic = info.use_static_ip === 1;
+      $('ip-mode-toggle').classList.toggle('active', isStatic);
+      $('ip-static-fields').style.display = isStatic ? '' : 'none';
+    }
+    if (info.static_ip) $('ip-addr').value = info.static_ip;
+    if (info.gateway) $('ip-gateway').value = info.gateway;
+    if (info.subnet) $('ip-subnet').value = info.subnet;
+    if (info.dns1) $('ip-dns1').value = info.dns1;
+    if (info.dns2) $('ip-dns2').value = info.dns2;
+    if (info.pwm_pin != null) $('pwm-pin-sel').value = info.pwm_pin;
+  } catch {}
+}
 
 function escapeHtml(str) {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');

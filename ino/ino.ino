@@ -29,7 +29,17 @@ void setup() {
   }
 
   pinMode(cfg.led_pin, OUTPUT);
-  digitalWrite(cfg.led_pin, HIGH);
+  digitalWrite(cfg.led_pin, cfg.led_invert ? LOW : HIGH);
+
+  if (cfg.use_static_ip) {
+    IPAddress ip, gw, subnet, dns1, dns2;
+    ip.fromString(cfg.static_ip);
+    gw.fromString(cfg.static_gateway);
+    subnet.fromString(cfg.static_subnet);
+    dns1.fromString(cfg.static_dns1);
+    dns2.fromString(cfg.static_dns2);
+    WiFi.config(ip, gw, subnet, dns1, dns2);
+  }
 
   WiFi.begin(cfg.wifi_ssid, cfg.wifi_password);
   Serial.print("WiFi");

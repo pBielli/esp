@@ -119,11 +119,17 @@ void setupRoutes() {
     a.add("/api/gpio/info");
     a.add("/api/gpio/read?pin=X");
     a.add("/api/gpio/analog/read");
+    a.add("/api/gpio/analog/write (POST: pin,value)");
     a.add("/api/gpio/set (POST: pin,mode,value)");
     a.add("/api/led/pin (POST)");
+    a.add("/api/led/invert (POST: enabled)");
     a.add("/api/led/on");
     a.add("/api/led/off");
     a.add("/api/led/blink");
+    a.add("/api/ntp/set (POST: server,tz_offset)");
+    a.add("/api/wifi/scan");
+    a.add("/api/ip/config (POST: dhcp,ip,gateway,subnet,dns1,dns2)");
+    a.add("/api/pwm/pin (POST)");
     a.add("/api/set/ssid (POST)");
     a.add("/api/set/pswd (POST)");
     String r; serializeJson(doc, r);
@@ -140,9 +146,24 @@ void setupRoutes() {
     doc["mdns"] = cfg.mdns_name;
     doc["ddns"] = cfg.ddns_hostname;
     doc["uptime"] = millis() / 1000;
-  doc["free_heap"] = ESP.getFreeHeap();
-  doc["local_ip"] = WiFi.localIP().toString();
-  IPAddress dip;
+    doc["free_heap"] = ESP.getFreeHeap();
+    doc["local_ip"] = WiFi.localIP().toString();
+    doc["gateway"] = WiFi.gatewayIP().toString();
+    doc["subnet"] = WiFi.subnetMask().toString();
+    doc["dns1"] = WiFi.dnsIP(0).toString();
+    doc["dns2"] = WiFi.dnsIP(1).toString();
+    doc["ntp_server"] = cfg.ntp_server;
+    doc["tz_offset"] = cfg.tz_offset;
+    doc["led_invert"] = cfg.led_invert;
+    doc["led_pin"] = cfg.led_pin;
+    doc["use_static_ip"] = cfg.use_static_ip;
+    doc["static_ip"] = cfg.static_ip;
+    doc["static_gateway"] = cfg.static_gateway;
+    doc["static_subnet"] = cfg.static_subnet;
+    doc["static_dns1"] = cfg.static_dns1;
+    doc["static_dns2"] = cfg.static_dns2;
+    doc["pwm_pin"] = cfg.pwm_pin;
+    IPAddress dip;
     if (WiFi.hostByName(cfg.ddns_hostname, dip)) doc["ddns_ip"] = dip.toString();
     String pub = getPublicIP();
     if (pub != "") doc["public_ip"] = pub;
@@ -233,6 +254,14 @@ void setupRoutes() {
     server.send(200, "application/json", analogReadPin());
   });
 
+  addOptions("/api/gpio/analog/write");
+  server.on("/api/gpio/analog/write", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    int pin = server.arg("pin").toInt();
+    int value = server.arg("value").toInt();
+    server.send(200, "application/json", analogWritePin(pin, value));
+  });
+
   addOptions("/api/gpio/set");
   server.on("/api/gpio/set", HTTP_POST, []() {
     if (!checkAuth()) return;
@@ -249,9 +278,18 @@ void setupRoutes() {
     if (pin < 0 || pin > 16) { server.send(400, "application/json", "{\"error\":\"Invalid pin\"}"); return; }
     cfg.led_pin = pin;
     pinMode(cfg.led_pin, OUTPUT);
-    digitalWrite(cfg.led_pin, HIGH);
+    digitalWrite(cfg.led_pin, cfg.led_invert ? LOW : HIGH);
     storageSave();
     server.send(200, "application/json", "{\"status\":\"saved\",\"led_pin\":" + String(cfg.led_pin) + "}");
+  });
+
+  addOptions("/api/led/invert");
+  server.on("/api/led/invert", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    String enabled = server.arg("enabled");
+    cfg.led_invert = (enabled == "1" || enabled == "true") ? 1 : 0;
+    storageSave();
+    server.send(200, "application/json", "{\"status\":\"saved\",\"led_invert\":" + String(cfg.led_invert) + "}");
   });
 
   addOptions("/api/led/on");
@@ -302,6 +340,73 @@ void setupRoutes() {
     strncpy(cfg.wifi_password, p.c_str(), 63);
     storageSave();
     server.send(200, "application/json", "{\"status\":\"saved\"}");
+  });
+
+  addOptions("/api/ntp/set");
+  server.on("/api/ntp/set", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    String server_name = server.arg("server");
+    String tz = server.arg("tz_offset");
+    if (server_name != "") strncpy(cfg.ntp_server, server_name.c_str(), 63);
+    if (tz != "") cfg.tz_offset = tz.toInt();
+    storageSave();
+    server.send(200, "application/json", "{\"status\":\"saved\",\"ntp_server\":\"" + String(cfg.ntp_server) + "\",\"tz_offset\":" + String(cfg.tz_offset) + "}");
+  });
+
+  addOptions("/api/wifi/scan");
+  server.on("/api/wifi/scan", []() {
+    if (!checkAuth()) return;
+    int n = WiFi.scanComplete();
+    if (n == WIFI_SCAN_FAILED) {
+      WiFi.scanNetworks(true);
+      server.send(200, "application/json", "{\"status\":\"scanning\"}");
+    } else if (n == WIFI_SCAN_RUNNING) {
+      server.send(200, "application/json", "{\"status\":\"scanning\"}");
+    } else {
+      JsonDocument doc;
+      JsonArray networks = doc["networks"].to<JsonArray>();
+      for (int i = 0; i < n; i++) {
+        JsonObject net = networks.add<JsonObject>();
+        net["ssid"] = WiFi.SSID(i);
+        net["rssi"] = WiFi.RSSI(i);
+        net["channel"] = WiFi.channel(i);
+        net["encryption"] = WiFi.encryptionType(i);
+      }
+      String r; serializeJson(doc, r);
+      WiFi.scanDelete();
+      server.send(200, "application/json", r);
+    }
+  });
+
+  addOptions("/api/ip/config");
+  server.on("/api/ip/config", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    String dhcp = server.arg("dhcp");
+    cfg.use_static_ip = (dhcp == "0" || dhcp == "false") ? 1 : 0;
+    if (cfg.use_static_ip) {
+      String ip = server.arg("ip");
+      String gw = server.arg("gateway");
+      String subnet = server.arg("subnet");
+      String dns1 = server.arg("dns1");
+      String dns2 = server.arg("dns2");
+      if (ip != "") strncpy(cfg.static_ip, ip.c_str(), 15);
+      if (gw != "") strncpy(cfg.static_gateway, gw.c_str(), 15);
+      if (subnet != "") strncpy(cfg.static_subnet, subnet.c_str(), 15);
+      if (dns1 != "") strncpy(cfg.static_dns1, dns1.c_str(), 15);
+      if (dns2 != "") strncpy(cfg.static_dns2, dns2.c_str(), 15);
+    }
+    storageSave();
+    server.send(200, "application/json", "{\"status\":\"saved\",\"use_static_ip\":" + String(cfg.use_static_ip) + "}");
+  });
+
+  addOptions("/api/pwm/pin");
+  server.on("/api/pwm/pin", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    int pin = server.arg("pin").toInt();
+    if (pin < 0 || pin > 16) { server.send(400, "application/json", "{\"error\":\"Invalid pin\"}"); return; }
+    cfg.pwm_pin = pin;
+    storageSave();
+    server.send(200, "application/json", "{\"status\":\"saved\",\"pwm_pin\":" + String(cfg.pwm_pin) + "}");
   });
 
   server.begin();

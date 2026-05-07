@@ -124,6 +124,7 @@
       <button class="tab-btn" data-tab="gpio">GPIO</button>
       <button class="tab-btn" data-tab="led">LED</button>
       <button class="tab-btn" data-tab="wifi">WIFI</button>
+      <button class="tab-btn" data-tab="network">NETWORK</button>
       <button class="tab-btn" data-tab="tools">TOOLS</button>
       <button class="tab-btn" data-tab="log">LOG</button>
     </nav>
@@ -149,6 +150,15 @@
               <div class="info-item"><span class="info-label">DDNS IP</span><span class="info-val" id="info-ddns-ip">—</span></div>
               <div class="info-item"><span class="info-label">RSSI</span><span class="info-val" id="info-rssi">—</span></div>
               <div class="info-item"><span class="info-label">RSSI %</span><span class="info-val" id="info-rssi-pct">—</span></div>
+              <div class="info-item"><span class="info-label">GATEWAY</span><span class="info-val" id="info-gateway">—</span></div>
+              <div class="info-item"><span class="info-label">SUBNET</span><span class="info-val" id="info-subnet">—</span></div>
+              <div class="info-item"><span class="info-label">DNS 1</span><span class="info-val" id="info-dns1">—</span></div>
+              <div class="info-item"><span class="info-label">DNS 2</span><span class="info-val" id="info-dns2">—</span></div>
+              <div class="info-item"><span class="info-label">NTP SERVER</span><span class="info-val" id="info-ntp-server">—</span></div>
+              <div class="info-item"><span class="info-label">TIMEZONE</span><span class="info-val" id="info-tz">—</span></div>
+              <div class="info-item"><span class="info-label">LED INVERT</span><span class="info-val" id="info-led-invert">—</span></div>
+              <div class="info-item"><span class="info-label">IP MODE</span><span class="info-val" id="info-ip-mode">—</span></div>
+              <div class="info-item"><span class="info-label">PWM PIN</span><span class="info-val" id="info-pwm-pin">—</span></div>
             </div>
           </div>
         </div>
@@ -274,6 +284,52 @@
           <div class="action-result hidden" id="gpio-result"></div>
         </div>
       </div>
+
+      <div class="card card--wide">
+        <div class="card-header">
+          <span class="card-icon">∿</span>
+          <span class="card-title">ANALOG</span>
+        </div>
+        <div class="analog-grid">
+          <div class="analog-read-block">
+            <label class="field-label">A0 INPUT</label>
+            <div class="analog-read-display">
+              <span class="analog-value" id="analog-read-value">—</span>
+              <span class="analog-unit">/ 100</span>
+            </div>
+            <button class="btn-action btn-secondary" id="btn-analog-read">READ A0</button>
+          </div>
+          <div class="analog-write-block">
+            <label class="field-label">PWM OUTPUT</label>
+            <div class="form-row">
+              <div class="form-field">
+                <label class="field-label" style="font-size:0.55rem">PIN</label>
+                <select class="field-select" id="pwm-pin-sel">
+                  <option value="0">GPIO 0</option>
+                  <option value="2">GPIO 2</option>
+                  <option value="4">GPIO 4</option>
+                  <option value="5" selected>GPIO 5</option>
+                  <option value="12">GPIO 12</option>
+                  <option value="13">GPIO 13</option>
+                  <option value="14">GPIO 14</option>
+                  <option value="15">GPIO 15</option>
+                  <option value="16">GPIO 16</option>
+                </select>
+              </div>
+              <div class="form-field">
+                <label class="field-label" style="font-size:0.55rem">VALUE 0-100</label>
+                <input type="range" class="field-slider" id="pwm-slider" min="0" max="100" value="0" />
+                <span class="slider-value" id="pwm-value-display">0</span>
+              </div>
+            </div>
+            <div class="form-row">
+              <button class="btn-action btn-primary" id="btn-pwm-write">WRITE PWM</button>
+              <button class="btn-action btn-secondary" id="btn-pwm-pin-save">SAVE PWM PIN</button>
+            </div>
+            <div class="action-result hidden" id="analog-result"></div>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -293,6 +349,14 @@
         <div class="led-controls">
           <button class="btn-action btn-led-on" id="btn-led-on">ON</button>
           <button class="btn-action btn-led-off" id="btn-led-off">OFF</button>
+        </div>
+        <div class="led-invert-block">
+          <label class="toggle-label">
+            <span class="toggle-text">INVERT OUTPUT</span>
+            <span class="toggle-switch" id="led-invert-toggle">
+              <span class="toggle-slider"></span>
+            </span>
+          </label>
         </div>
       </div>
 
@@ -373,6 +437,106 @@
           <div class="action-result hidden" id="wifi-result"></div>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- NETWORK -->
+  <section class="tab-pane" id="tab-network">
+    <div class="cards-grid">
+
+      <div class="card card--wide">
+        <div class="card-header">
+          <span class="card-icon">◷</span>
+          <span class="card-title">NTP CONFIGURATION</span>
+        </div>
+        <div class="action-block">
+          <div class="form-row">
+            <div class="form-field">
+              <label class="field-label">NTP SERVER</label>
+              <div class="field-row">
+                <span class="field-prefix">⌁</span>
+                <input type="text" class="field-input" id="ntp-server" placeholder="pool.ntp.org" />
+              </div>
+            </div>
+            <div class="form-field">
+              <label class="field-label">TIMEZONE OFFSET (seconds)</label>
+              <div class="field-row">
+                <span class="field-prefix">±</span>
+                <input type="number" class="field-input" id="ntp-tz" placeholder="3600" />
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <button class="btn-action btn-primary" id="btn-ntp-save">SAVE NTP</button>
+          </div>
+          <div class="action-result hidden" id="ntp-result"></div>
+        </div>
+      </div>
+
+      <div class="card card--wide">
+        <div class="card-header">
+          <span class="card-icon">⌁</span>
+          <span class="card-title">WIFI SCAN</span>
+          <button class="card-action-btn" id="btn-wifi-scan">SCAN</button>
+        </div>
+        <div class="action-block">
+          <div class="scan-status" id="scan-status">Click SCAN to list available networks.</div>
+          <div class="scan-results hidden" id="scan-results"></div>
+        </div>
+      </div>
+
+      <div class="card card--wide">
+        <div class="card-header">
+          <span class="card-icon">◎</span>
+          <span class="card-title">IP CONFIGURATION</span>
+        </div>
+        <div class="action-block">
+          <div class="form-row">
+            <div class="form-field">
+              <label class="toggle-label">
+                <span class="toggle-text">DHCP</span>
+                <span class="toggle-switch" id="ip-mode-toggle">
+                  <span class="toggle-slider"></span>
+                </span>
+                <span class="toggle-text">STATIC</span>
+              </label>
+            </div>
+          </div>
+          <div class="ip-static-fields" id="ip-static-fields">
+            <div class="form-row">
+              <div class="form-field">
+                <label class="field-label">IP ADDRESS</label>
+                <input type="text" class="field-input" id="ip-addr" placeholder="192.168.1.100" />
+              </div>
+              <div class="form-field">
+                <label class="field-label">GATEWAY</label>
+                <input type="text" class="field-input" id="ip-gateway" placeholder="192.168.1.1" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-field">
+                <label class="field-label">SUBNET</label>
+                <input type="text" class="field-input" id="ip-subnet" placeholder="255.255.255.0" />
+              </div>
+              <div class="form-field">
+                <label class="field-label">DNS 1</label>
+                <input type="text" class="field-input" id="ip-dns1" placeholder="8.8.8.8" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-field">
+                <label class="field-label">DNS 2</label>
+                <input type="text" class="field-input" id="ip-dns2" placeholder="8.8.4.4" />
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <button class="btn-action btn-primary" id="btn-ip-save">SAVE IP CONFIG</button>
+          </div>
+          <div class="action-result hidden" id="ip-result"></div>
+        </div>
+      </div>
+
     </div>
   </section>
 

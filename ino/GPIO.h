@@ -10,5 +10,6 @@ void ledOn();
 void ledOff();
 void ledBlink(int times);
 String analogReadPin();
+String analogWritePin(int pin, int value);
 
 #endif

@@ -37,27 +37,39 @@ String gpioInfo() {
 }
 
 void ledOn() {
-  digitalWrite(cfg.led_pin, LOW);
+  digitalWrite(cfg.led_pin, cfg.led_invert ? HIGH : LOW);
 }
 
 void ledOff() {
-  digitalWrite(cfg.led_pin, HIGH);
+  digitalWrite(cfg.led_pin, cfg.led_invert ? LOW : HIGH);
 }
 
 String analogReadPin() {
   int val = analogRead(A0);
   float voltage = val * (3.3f / 1024.0f);
-  char buf[64];
-  snprintf(buf, sizeof(buf), "{\"pin\":\"A0\",\"raw\":%d,\"voltage\":%.2f}", val, voltage);
+  int mapped = map(val, 0, 1023, 0, 100);
+  char buf[96];
+  snprintf(buf, sizeof(buf), "{\"pin\":\"A0\",\"raw\":%d,\"voltage\":%.2f,\"value\":%d}", val, voltage, mapped);
+  return String(buf);
+}
+
+String analogWritePin(int pin, int value) {
+  if (pin < 0 || pin > 16) return "{\"error\":\"Invalid pin\"}";
+  if (value < 0 || value > 100) return "{\"error\":\"Value must be 0-100\"}";
+  pinMode(pin, OUTPUT);
+  int pwmVal = map(value, 0, 100, 0, 1023);
+  analogWrite(pin, pwmVal);
+  char buf[96];
+  snprintf(buf, sizeof(buf), "{\"pin\":%d,\"value\":%d,\"pwm\":%d}", pin, value, pwmVal);
   return String(buf);
 }
 
 void ledBlink(int times) {
   for (int i = 0; i < times; i++) {
-    digitalWrite(cfg.led_pin, LOW);
+    ledOn();
     delay(200);
-    digitalWrite(cfg.led_pin, HIGH);
+    ledOff();
     delay(200);
   }
-  digitalWrite(cfg.led_pin, HIGH);
+  ledOff();
 }

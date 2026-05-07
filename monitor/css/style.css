@@ -905,6 +905,186 @@ body {
   to { opacity: 0; transform: translateX(20px); height: 0; padding: 0; margin: 0; }
 }
 
+/* ── Toggle Switch ── */
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-text {
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
+  color: var(--text-dim);
+}
+
+.toggle-switch {
+  width: 40px;
+  height: 22px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  position: relative;
+  transition: all var(--transition);
+  cursor: pointer;
+  display: inline-block;
+}
+
+.toggle-slider {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: var(--text-dim);
+  transition: all var(--transition);
+}
+
+.toggle-switch.active {
+  border-color: var(--green);
+  background: rgba(0,255,136,0.1);
+}
+
+.toggle-switch.active .toggle-slider {
+  left: 20px;
+  background: var(--green);
+  box-shadow: 0 0 6px rgba(0,255,136,0.4);
+}
+
+/* ── LED Invert ── */
+.led-invert-block {
+  margin-top: 1rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: center;
+}
+
+/* ── Analog Grid ── */
+.analog-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.analog-read-block,
+.analog-write-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.analog-read-display {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+}
+
+.analog-value {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--green);
+  text-shadow: 0 0 15px rgba(0,255,136,0.3);
+}
+
+.analog-unit {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+/* ── Range Slider ── */
+.field-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  outline: none;
+  cursor: pointer;
+}
+
+.field-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--green);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 6px rgba(0,255,136,0.4);
+}
+
+.field-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--green);
+  border: none;
+  cursor: pointer;
+}
+
+.slider-value {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--green);
+  text-align: center;
+}
+
+/* ── Scan Table ── */
+.scan-status {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-bottom: 0.5rem;
+}
+
+.scan-status.success { color: var(--green); }
+.scan-status.error { color: var(--red); }
+
+.scan-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.scan-table th {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  font-weight: normal;
+}
+
+.scan-table td {
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid rgba(0,255,136,0.05);
+  color: var(--text);
+}
+
+.scan-table tr:hover td {
+  background: rgba(0,255,136,0.03);
+}
+
+.scan-results {
+  margin-top: 0.3rem;
+}
+
+/* ── IP Config ── */
+.ip-static-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+@media (max-width: 600px) {
+  .analog-grid { grid-template-columns: 1fr; }
+  .scan-table { font-size: 0.65rem; }
+}
+
 /* Utilities */
 .hidden { display: none !important; }
 
