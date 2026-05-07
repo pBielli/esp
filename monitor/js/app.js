@@ -183,9 +183,11 @@ function initDashboard(info) {
   clearInterval(state.refreshInterval);
   state.refreshInterval = setInterval(refreshAll, 30000);
 
-  // Clock every second
+  // Sync clock on load
+  loadTime();
+  // Refresh clock every 10 minutes
   clearInterval(state.timeInterval);
-  state.timeInterval = setInterval(loadTime, 1000);
+  state.timeInterval = setInterval(loadTime, 600000);
 }
 
 async function refreshAll() {
