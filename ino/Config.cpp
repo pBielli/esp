@@ -27,7 +27,7 @@ void storageReset() {
   strncpy(cfg.ddns_hostname, "YOUR_DUCKDNS_HOSTNAME", 63);
   strncpy(cfg.duckdns_token, "YOUR_DUCKDNS_TOKEN", 47);
   strncpy(cfg.duckdns_domain, "YOUR_DUCKDNS_DOMAIN", 31);
-  cfg.led_pin = 2;
+  cfg.led_pin = 2;;
   storageSave();
 }
 
