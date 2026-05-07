@@ -1,0 +1,15 @@
+#ifndef NTP_H
+#define NTP_H
+
+#include <Arduino.h>
+#include <time.h>
+#include <WiFiUdp.h>
+
+extern WiFiUDP ntpUdp;
+extern unsigned long lastNtpSync;
+extern const unsigned long ntpSyncInterval;
+
+void ntpBegin();
+String ntpGetTime();
+
+#endif

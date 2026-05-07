@@ -31,7 +31,7 @@ The ESP8266 firmware **does not send CORS headers** by default. This means reque
 ### Option A — Add CORS to firmware (recommended)
 Add this to your ESP8266 firmware before any `server.send()` call:
 ```cpp
-server.sendHeader("Access-Control-Allow-Origin", "*");
+server.sendHeader("Access-Control-Allow-Origin", "https://*.github.io");
 server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
 server.sendHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
 ```
