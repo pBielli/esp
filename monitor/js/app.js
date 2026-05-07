@@ -221,9 +221,9 @@ function updateInfoCard(info) {
   setText('info-mdns', info.mdns || '—');
   setText('info-ddns-host', info.ddns || '—');
   setText('info-uptime',  info.uptime  ? formatUptime(info.uptime) : '—');
-  if (info.free_heap != null && info.total_heap > 0) {
-    const pct = Math.round((1 - info.free_heap / info.total_heap) * 100);
-    setText('info-heap-pct', pct + '%');
+  if (info.free_heap != null) {
+    const kb = Math.round(info.free_heap / 1024);
+    setText('info-heap-pct', kb + ' KB');
   } else {
     setText('info-heap-pct', '—');
   }

@@ -140,7 +140,6 @@ void setupRoutes() {
     doc["ddns"] = cfg.ddns_hostname;
     doc["uptime"] = millis() / 1000;
   doc["free_heap"] = ESP.getFreeHeap();
-  doc["total_heap"] = ESP.getHeapSize();
   doc["local_ip"] = WiFi.localIP().toString();
   IPAddress dip;
     if (WiFi.hostByName(cfg.ddns_hostname, dip)) doc["ddns_ip"] = dip.toString();
