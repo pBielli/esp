@@ -210,6 +210,7 @@ $('btn-refresh').addEventListener('click', refreshAll);
 // ── Info ───────────────────────────────────────────────────
 function updateInfoCard(info) {
   // SYSTEM card
+  setText('info-fw-version', info.fw_version || '—');
   setText('info-mdns',      info.mdns        || '—');
   setText('info-mac',       info.mac         || '—');
   setText('info-uptime',    info.uptime      ? formatUptime(info.uptime) : '—');
@@ -226,7 +227,7 @@ function updateInfoCard(info) {
   setText('info-ssid',      info.ssid        || '—');
   setText('info-rssi',      info.rssi        ? `${info.rssi} dBm` : '—');
   if (info.rssi != null) {
-    const rssiPct = Math.max(0, Math.min(100, Math.round(-info.rssi)));
+    const rssiPct = Math.max(0, Math.min(100, Math.round(((info.rssi + 100) / 60) * 100)));
     setText('info-rssi-pct', rssiPct + '%');
   } else {
     setText('info-rssi-pct', '—');
@@ -335,6 +336,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (btn.dataset.tab === 'led') loadLedInvert();
     if (btn.dataset.tab === 'ddns') loadDdnsConfig();
     if (btn.dataset.tab === 'network') loadNetworkTab();
+    if (btn.dataset.tab === 'system') loadSystemTab();
   });
 });
 
@@ -364,6 +366,7 @@ async function loadDdnsConfig() {
     if (info.ddns) $('ddns-hostname').placeholder = info.ddns;
     if (info.ddns_domain) $('ddns-domain').value = info.ddns_domain;
     if (info.ddns_upd_url) $('ddns-upd-url').value = info.ddns_upd_url;
+    if (info.ddns_check_interval != null) $('ddns-interval').value = info.ddns_check_interval;
   } catch {}
 }
 
@@ -385,6 +388,21 @@ $('btn-ddns-config-save').addEventListener('click', async () => {
   } catch (err) {
     showResult('ddns-config-result', `Error: ${err.message}`, 'error');
     toast('DDNS config failed', 'error');
+  }
+});
+
+// ── DDNS Interval ──────────────────────────────────────────
+$('btn-ddns-interval-save').addEventListener('click', async () => {
+  const interval = parseInt($('ddns-interval').value);
+  if (!interval || interval < 30) { toast('Minimum interval is 30 seconds', 'warning'); return; }
+  const body = new URLSearchParams({ interval }).toString();
+  try {
+    const data = await apiFetch('/api/ddns/interval', { method: 'POST', auth: true, body });
+    showResult('ddns-interval-result', `Check interval saved: ${data.ddns_check_interval}s`, 'success');
+    toast('DDNS interval saved', 'success');
+  } catch (err) {
+    showResult('ddns-interval-result', `Error: ${err.message}`, 'error');
+    toast('DDNS interval failed', 'error');
   }
 });
 
@@ -463,6 +481,33 @@ $('btn-gpio-set').addEventListener('click', async () => {
   } catch (err) {
     showResult('gpio-result', `Error: ${err.message}`, 'error');
     toast('GPIO set failed', 'error');
+  }
+});
+
+// ── GPIO Pulse/Toggle ──────────────────────────────────────
+$('btn-gpio-pulse').addEventListener('click', async () => {
+  const pin = $('gpio-pin-sel').value;
+  const body = new URLSearchParams({ pin }).toString();
+  try {
+    const data = await apiFetch('/api/gpio/pulse', { method: 'POST', auth: true, body });
+    showResult('gpio-result', `GPIO ${data.pin} pulsed (${data.ms || 500}ms)`, 'success');
+    toast(`GPIO ${pin} pulsed`, 'success');
+  } catch (err) {
+    showResult('gpio-result', `Error: ${err.message}`, 'error');
+    toast('Pulse failed', 'error');
+  }
+});
+
+$('btn-gpio-toggle').addEventListener('click', async () => {
+  const pin = $('gpio-pin-sel').value;
+  const body = new URLSearchParams({ pin }).toString();
+  try {
+    const data = await apiFetch('/api/gpio/toggle', { method: 'POST', auth: true, body });
+    showResult('gpio-result', `GPIO ${data.pin} toggled → ${data.value === 1 ? 'HIGH' : 'LOW'}`, 'success');
+    toast(`GPIO ${pin} toggled`, 'success');
+  } catch (err) {
+    showResult('gpio-result', `Error: ${err.message}`, 'error');
+    toast('Toggle failed', 'error');
   }
 });
 
@@ -776,6 +821,24 @@ $('btn-save-pswd').addEventListener('click', async () => {
   }
 });
 
+// ── PING ─────────────────────────────────────────────────
+$('btn-ping').addEventListener('click', async () => {
+  const host = $('ping-host').value.trim();
+  if (!host) { toast('Enter a host or IP', 'warning'); return; }
+  hideResult('ping-result');
+  try {
+    const data = await apiFetch(`/api/ping?host=${encodeURIComponent(host)}`, { auth: true });
+    if (data.success) {
+      showResult('ping-result', `${data.host} is alive — ${data.avg_time_ms}ms avg (${data.transmitted} sent, ${data.received} received)`, 'success');
+    } else {
+      showResult('ping-result', `${data.host} is unreachable (${data.received}/${data.transmitted} packets)`, 'error');
+    }
+  } catch (err) {
+    showResult('ping-result', `Error: ${err.message}`, 'error');
+    toast('Ping failed', 'error');
+  }
+});
+
 // ── Tools Tab ──────────────────────────────────────────────
 $('btn-curl').addEventListener('click', async () => {
   const url = $('curl-url').value.trim();
@@ -819,6 +882,72 @@ $('btn-api-help').addEventListener('click', async () => {
   }
 });
 
+// ── Config Export/Import ──────────────────────────────────
+$('btn-config-export').addEventListener('click', async () => {
+  try {
+    const data = await apiFetch('/api/config/export', { auth: true });
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'esp8266-config.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Config exported', 'success');
+  } catch (err) {
+    toast(`Export failed: ${err.message}`, 'error');
+  }
+});
+
+$('btn-config-import').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const json = JSON.parse(text);
+    const body = new URLSearchParams({ config: text }).toString();
+    const data = await apiFetch('/api/config/import', { method: 'POST', auth: true, body });
+    showResult('config-import-result', `Import: ${data.status}`, 'success');
+    toast('Config imported — reboot recommended', 'success');
+  } catch (err) {
+    showResult('config-import-result', `Error: ${err.message}`, 'error');
+    toast('Import failed', 'error');
+  }
+  e.target.value = '';
+});
+
+// ── System Tab ────────────────────────────────────────────
+async function loadSystemTab() {
+  try {
+    const info = await apiFetch('/api/info');
+    setText('sys-version', info.fw_version || '—');
+    setText('sys-build',   info.build_date || '—');
+  } catch {}
+}
+
+$('btn-reboot').addEventListener('click', async () => {
+  if (!confirm('Reboot the device? Connection will be lost.')) return;
+  try {
+    await apiFetch('/api/system/reboot', { method: 'POST', auth: true });
+    showResult('reboot-result', 'Rebooting... device will be offline for a moment.', 'success');
+    toast('Rebooting...', 'warning', 5000);
+  } catch (err) {
+    showResult('reboot-result', `Reboot command sent (device may be offline): ${err.message}`, 'warning');
+  }
+});
+
+$('btn-factory-reset').addEventListener('click', async () => {
+  if (!confirm('⚠️ FACTORY RESET — ALL settings will be lost! Are you sure?')) return;
+  if (!confirm('This CANNOT be undone. Proceed with factory reset?')) return;
+  try {
+    await apiFetch('/api/system/factory-reset', { method: 'POST', auth: true });
+    showResult('factory-reset-result', 'Factory reset done — device will reboot with defaults.', 'success');
+    toast('Factory reset — rebooting', 'warning', 5000);
+  } catch (err) {
+    showResult('factory-reset-result', `Reset command sent (device may be offline): ${err.message}`, 'warning');
+  }
+});
+
 // ── Log Tab ────────────────────────────────────────────────
 async function loadLog() {
   const container = $('log-container');
@@ -835,7 +964,7 @@ async function loadLog() {
     for (const entry of entries.slice().reverse()) {
       const div = document.createElement('div');
       div.className = 'log-entry';
-      const timeStr = entry.time ? new Date(entry.time * 1000).toLocaleTimeString() : '—';
+      const timeStr = entry.time ? formatUptime(entry.time / 1000) : '—';
       div.innerHTML = `<span class="log-time">${timeStr}</span><span class="log-msg">${escapeHtml(entry.msg || '')}</span>`;
       container.appendChild(div);
     }

@@ -4,6 +4,7 @@
 #include "NTP.h"
 #include "GPIO.h"
 #include "DDNS.h"
+#include "Ping.h"
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <WiFiClient.h>
@@ -11,17 +12,22 @@
 ESP8266WebServer server(80);
 
 String base64Decode(String input) {
-  const char t[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const char b64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  int len = input.length();
   String out = "";
-  int i = 0;
-  while (i < input.length()) {
-    int a = strchr(t, input[i++]) - t;
-    int b = i < input.length() ? strchr(t, input[i++]) - t : 0;
-    int c = i < input.length() ? strchr(t, input[i++]) - t : 0;
-    int d = i < input.length() ? strchr(t, input[i++]) - t : 0;
-    out += char((a << 2) | (b >> 4));
-    if (i-2 >= 0 && input[i-2] != '=') out += char(((b & 15) << 4) | (c >> 2));
-    if (i-1 >= 0 && input[i-1] != '=') out += char(((c & 3) << 6) | d);
+  int buf = 0, bits = 0;
+  for (int i = 0; i < len; i++) {
+    char c = input[i];
+    if (c == '=') break;
+    const char* p = strchr(b64, c);
+    if (!p) continue;
+    int val = p - b64;
+    buf = (buf << 6) | val;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      out += char((buf >> bits) & 0xFF);
+    }
   }
   return out;
 }
@@ -42,7 +48,7 @@ bool checkAuth() {
 }
 
 void sendCORS() {
-  server.sendHeader("Access-Control-Allow-Origin", "https://pbielli.github.io");
+  server.sendHeader("Access-Control-Allow-Origin", CORS_ORIGIN);
   server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   server.sendHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
 }
@@ -106,6 +112,15 @@ void setupRoutes() {
     a.add("/api/pwm/pin (POST)");
     a.add("/api/set/ssid (POST)");
     a.add("/api/set/pswd (POST)");
+    a.add("/api/ping?host=x");
+    a.add("/api/system/reboot (POST)");
+    a.add("/api/system/factory-reset (POST)");
+    a.add("/api/system/version");
+    a.add("/api/config/export");
+    a.add("/api/config/import (POST)");
+    a.add("/api/ddns/interval (POST)");
+    a.add("/api/gpio/pulse (POST: pin,ms)");
+    a.add("/api/gpio/toggle (POST: pin)");
     String r; serializeJson(doc, r);
     server.send(200, "application/json", r);
   });
@@ -139,11 +154,13 @@ void setupRoutes() {
     doc["static_dns2"] = cfg.static_dns2;
     doc["pwm_pin"] = cfg.pwm_pin;
     doc["use_custom_dns"] = cfg.use_custom_dns;
+    doc["ddns_check_interval"] = cfg.ddns_check_interval;
     doc["ddns_upd_url"] = cfg.ddns_upd_url;
-    IPAddress dip;
-    if (WiFi.hostByName(cfg.ddns_hostname, dip)) doc["ddns_ip"] = dip.toString();
-    String pub = getPublicIP();
-    if (pub != "") doc["public_ip"] = pub;
+    doc["firmware"] = FIRMWARE_VERSION;
+    String ddnsIp = getCachedDDNSIP();
+    if (ddnsIp != "") doc["ddns_ip"] = ddnsIp;
+    String pubIp = getCachedPublicIP();
+    if (pubIp != "") doc["public_ip"] = pubIp;
     String r; serializeJson(doc, r);
     server.send(200, "application/json", r);
   });
@@ -204,10 +221,10 @@ void setupRoutes() {
     String domain = server.arg("domain");
     String token = server.arg("token");
     String upd_url = server.arg("upd_url");
-    if (hostname != "") strncpy(cfg.ddns_hostname, hostname.c_str(), 63);
-    if (domain != "") strncpy(cfg.ddns_domain, domain.c_str(), 31);
-    if (token != "") strncpy(cfg.ddns_token, token.c_str(), 47);
-    if (upd_url != "") strncpy(cfg.ddns_upd_url, upd_url.c_str(), 255);
+    if (hostname != "") strncpy(cfg.ddns_hostname, hostname.c_str(), sizeof(cfg.ddns_hostname) - 1);
+    if (domain != "") strncpy(cfg.ddns_domain, domain.c_str(), sizeof(cfg.ddns_domain) - 1);
+    if (token != "") strncpy(cfg.ddns_token, token.c_str(), sizeof(cfg.ddns_token) - 1);
+    if (upd_url != "") strncpy(cfg.ddns_upd_url, upd_url.c_str(), sizeof(cfg.ddns_upd_url) - 1);
     storageSave();
     server.send(200, "application/json", "{\"status\":\"saved\",\"ddns_hostname\":\"" + String(cfg.ddns_hostname) + "\",\"ddns_domain\":\"" + String(cfg.ddns_domain) + "\"}");
   });
@@ -329,7 +346,7 @@ void setupRoutes() {
     if (!checkAuth()) return;
     String s = server.arg("ssid");
     if (s == "") { server.send(400, "application/json", "{\"error\":\"Missing ssid\"}"); return; }
-    strncpy(cfg.wifi_ssid, s.c_str(), 31);
+    strncpy(cfg.wifi_ssid, s.c_str(), sizeof(cfg.wifi_ssid) - 1);
     storageSave();
     server.send(200, "application/json", "{\"status\":\"saved\"}");
   });
@@ -339,7 +356,7 @@ void setupRoutes() {
     if (!checkAuth()) return;
     String p = server.arg("pswd");
     if (p == "") { server.send(400, "application/json", "{\"error\":\"Missing pswd\"}"); return; }
-    strncpy(cfg.wifi_password, p.c_str(), 63);
+    strncpy(cfg.wifi_password, p.c_str(), sizeof(cfg.wifi_password) - 1);
     storageSave();
     server.send(200, "application/json", "{\"status\":\"saved\"}");
   });
@@ -349,7 +366,7 @@ void setupRoutes() {
     if (!checkAuth()) return;
     String m = server.arg("mdns");
     if (m == "") { server.send(400, "application/json", "{\"error\":\"Missing mdns\"}"); return; }
-    strncpy(cfg.mdns_name, m.c_str(), 31);
+    strncpy(cfg.mdns_name, m.c_str(), sizeof(cfg.mdns_name) - 1);
     storageSave();
     server.send(200, "application/json", "{\"status\":\"saved\",\"mdns\":\"" + String(cfg.mdns_name) + "\"}");
   });
@@ -359,7 +376,7 @@ void setupRoutes() {
     if (!checkAuth()) return;
     String server_name = server.arg("server");
     String tz = server.arg("tz_offset");
-    if (server_name != "") strncpy(cfg.ntp_server, server_name.c_str(), 63);
+    if (server_name != "") strncpy(cfg.ntp_server, server_name.c_str(), sizeof(cfg.ntp_server) - 1);
     if (tz != "") cfg.tz_offset = tz.toInt();
     storageSave();
     server.send(200, "application/json", "{\"status\":\"saved\",\"ntp_server\":\"" + String(cfg.ntp_server) + "\",\"tz_offset\":" + String(cfg.tz_offset) + "}");
@@ -396,14 +413,14 @@ void setupRoutes() {
     String dns1 = server.arg("dns1");
     String dns2 = server.arg("dns2");
     String ucd = server.arg("use_custom_dns");
-    if (dns1 != "") strncpy(cfg.static_dns1, dns1.c_str(), 15);
-    if (dns2 != "") strncpy(cfg.static_dns2, dns2.c_str(), 15);
+    if (dns1 != "") strncpy(cfg.static_dns1, dns1.c_str(), sizeof(cfg.static_dns1) - 1);
+    if (dns2 != "") strncpy(cfg.static_dns2, dns2.c_str(), sizeof(cfg.static_dns2) - 1);
     if (ucd != "") cfg.use_custom_dns = (ucd == "1" || ucd == "true") ? 1 : 0;
     storageSave();
     if (cfg.use_custom_dns) {
       applyNetworkConfig();
     } else {
-      WiFi.disconnect();
+      WiFi.config(WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask());
     }
     server.send(200, "application/json", "{\"status\":\"saved\",\"dns1\":\"" + String(cfg.static_dns1) + "\",\"dns2\":\"" + String(cfg.static_dns2) + "\",\"use_custom_dns\":" + String(cfg.use_custom_dns) + "}");
   });
@@ -417,9 +434,9 @@ void setupRoutes() {
       String ip = server.arg("ip");
       String gw = server.arg("gateway");
       String subnet = server.arg("subnet");
-      if (ip != "") strncpy(cfg.static_ip, ip.c_str(), 15);
-      if (gw != "") strncpy(cfg.static_gateway, gw.c_str(), 15);
-      if (subnet != "") strncpy(cfg.static_subnet, subnet.c_str(), 15);
+      if (ip != "") strncpy(cfg.static_ip, ip.c_str(), sizeof(cfg.static_ip) - 1);
+      if (gw != "") strncpy(cfg.static_gateway, gw.c_str(), sizeof(cfg.static_gateway) - 1);
+      if (subnet != "") strncpy(cfg.static_subnet, subnet.c_str(), sizeof(cfg.static_subnet) - 1);
     }
     storageSave();
     server.send(200, "application/json", "{\"status\":\"saved\",\"use_static_ip\":" + String(cfg.use_static_ip) + "}");
@@ -433,6 +450,131 @@ void setupRoutes() {
     cfg.pwm_pin = pin;
     storageSave();
     server.send(200, "application/json", "{\"status\":\"saved\",\"pwm_pin\":" + String(cfg.pwm_pin) + "}");
+  });
+
+  addOptions("/api/ping");
+  server.on("/api/ping", []() {
+    sendCORS();
+    String host = server.arg("host");
+    if (host == "") { server.send(400, "application/json", "{\"error\":\"Missing host\"}"); return; }
+    String result = pingHost(host);
+    server.send(200, "application/json", result);
+  });
+
+  addOptions("/api/system/reboot");
+  server.on("/api/system/reboot", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    server.send(200, "application/json", "{\"status\":\"rebooting\"}");
+    delay(500);
+    ESP.restart();
+  });
+
+  addOptions("/api/system/factory-reset");
+  server.on("/api/system/factory-reset", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    server.send(200, "application/json", "{\"status\":\"factory_reset\"}");
+    delay(500);
+    storageReset();
+    ESP.restart();
+  });
+
+  addOptions("/api/system/version");
+  server.on("/api/system/version", []() {
+    sendCORS();
+    JsonDocument doc;
+    doc["version"] = FIRMWARE_VERSION;
+    doc["build_date"] = __DATE__;
+    doc["build_time"] = __TIME__;
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
+  });
+
+  addOptions("/api/config/export");
+  server.on("/api/config/export", []() {
+    if (!checkAuth()) return;
+    JsonDocument doc;
+    doc["wifi_ssid"] = cfg.wifi_ssid;
+    doc["wifi_password"] = cfg.wifi_password;
+    doc["mdns_name"] = cfg.mdns_name;
+    doc["admin_password"] = cfg.admin_password;
+    doc["ddns_hostname"] = cfg.ddns_hostname;
+    doc["ddns_domain"] = cfg.ddns_domain;
+    doc["ddns_token"] = cfg.ddns_token;
+    doc["led_pin"] = cfg.led_pin;
+    doc["tz_offset"] = cfg.tz_offset;
+    doc["ntp_server"] = cfg.ntp_server;
+    doc["led_invert"] = cfg.led_invert;
+    doc["use_static_ip"] = cfg.use_static_ip;
+    doc["static_ip"] = cfg.static_ip;
+    doc["static_gateway"] = cfg.static_gateway;
+    doc["static_subnet"] = cfg.static_subnet;
+    doc["static_dns1"] = cfg.static_dns1;
+    doc["static_dns2"] = cfg.static_dns2;
+    doc["pwm_pin"] = cfg.pwm_pin;
+    doc["use_custom_dns"] = cfg.use_custom_dns;
+    doc["ddns_check_interval"] = cfg.ddns_check_interval;
+    doc["ddns_upd_url"] = cfg.ddns_upd_url;
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
+  });
+
+  addOptions("/api/config/import");
+  server.on("/api/config/import", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    String body = server.arg("plain");
+    if (body == "") { server.send(400, "application/json", "{\"error\":\"Missing JSON body\"}"); return; }
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, body);
+    if (err) { server.send(400, "application/json", "{\"error\":\"Invalid JSON\"}"); return; }
+    if (doc["wifi_ssid"]) strncpy(cfg.wifi_ssid, doc["wifi_ssid"], sizeof(cfg.wifi_ssid) - 1);
+    if (doc["wifi_password"]) strncpy(cfg.wifi_password, doc["wifi_password"], sizeof(cfg.wifi_password) - 1);
+    if (doc["mdns_name"]) strncpy(cfg.mdns_name, doc["mdns_name"], sizeof(cfg.mdns_name) - 1);
+    if (doc["admin_password"]) strncpy(cfg.admin_password, doc["admin_password"], sizeof(cfg.admin_password) - 1);
+    if (doc["ddns_hostname"]) strncpy(cfg.ddns_hostname, doc["ddns_hostname"], sizeof(cfg.ddns_hostname) - 1);
+    if (doc["ddns_domain"]) strncpy(cfg.ddns_domain, doc["ddns_domain"], sizeof(cfg.ddns_domain) - 1);
+    if (doc["ddns_token"]) strncpy(cfg.ddns_token, doc["ddns_token"], sizeof(cfg.ddns_token) - 1);
+    if (doc["led_pin"]) cfg.led_pin = doc["led_pin"];
+    if (doc["tz_offset"]) cfg.tz_offset = doc["tz_offset"];
+    if (doc["ntp_server"]) strncpy(cfg.ntp_server, doc["ntp_server"], sizeof(cfg.ntp_server) - 1);
+    if (doc["led_invert"]) cfg.led_invert = doc["led_invert"];
+    if (doc["use_static_ip"]) cfg.use_static_ip = doc["use_static_ip"];
+    if (doc["static_ip"]) strncpy(cfg.static_ip, doc["static_ip"], sizeof(cfg.static_ip) - 1);
+    if (doc["static_gateway"]) strncpy(cfg.static_gateway, doc["static_gateway"], sizeof(cfg.static_gateway) - 1);
+    if (doc["static_subnet"]) strncpy(cfg.static_subnet, doc["static_subnet"], sizeof(cfg.static_subnet) - 1);
+    if (doc["static_dns1"]) strncpy(cfg.static_dns1, doc["static_dns1"], sizeof(cfg.static_dns1) - 1);
+    if (doc["static_dns2"]) strncpy(cfg.static_dns2, doc["static_dns2"], sizeof(cfg.static_dns2) - 1);
+    if (doc["pwm_pin"]) cfg.pwm_pin = doc["pwm_pin"];
+    if (doc["use_custom_dns"]) cfg.use_custom_dns = doc["use_custom_dns"];
+    if (doc["ddns_check_interval"]) cfg.ddns_check_interval = doc["ddns_check_interval"];
+    if (doc["ddns_upd_url"]) strncpy(cfg.ddns_upd_url, doc["ddns_upd_url"], sizeof(cfg.ddns_upd_url) - 1);
+    storageSave();
+    server.send(200, "application/json", "{\"status\":\"imported\"}");
+  });
+
+  addOptions("/api/ddns/interval");
+  server.on("/api/ddns/interval", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    int sec = server.arg("seconds").toInt();
+    if (sec < 10 || sec > 86400) { server.send(400, "application/json", "{\"error\":\"Interval must be 10-86400 seconds\"}"); return; }
+    cfg.ddns_check_interval = sec;
+    storageSave();
+    server.send(200, "application/json", "{\"status\":\"saved\",\"ddns_check_interval\":" + String(cfg.ddns_check_interval) + "}");
+  });
+
+  addOptions("/api/gpio/pulse");
+  server.on("/api/gpio/pulse", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    int pin = server.arg("pin").toInt();
+    int ms = server.arg("ms").toInt();
+    if (ms < 1 || ms > 10000) ms = 500;
+    server.send(200, "application/json", gpioPulse(pin, ms));
+  });
+
+  addOptions("/api/gpio/toggle");
+  server.on("/api/gpio/toggle", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    int pin = server.arg("pin").toInt();
+    server.send(200, "application/json", gpioToggle(pin));
   });
 
   server.begin();

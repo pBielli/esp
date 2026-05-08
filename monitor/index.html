@@ -125,6 +125,7 @@
       <button class="tab-btn" data-tab="led">LED</button>
       <button class="tab-btn" data-tab="wifi">WIFI</button>
       <button class="tab-btn" data-tab="network">NETWORK</button>
+      <button class="tab-btn" data-tab="system">SYSTEM</button>
       <button class="tab-btn" data-tab="tools">TOOLS</button>
       <button class="tab-btn" data-tab="log">LOG</button>
     </nav>
@@ -142,6 +143,7 @@
               <span class="card-title">SYSTEM</span>
             </div>
             <div class="info-grid">
+              <div class="info-item"><span class="info-label">FW VERSION</span><span class="info-val" id="info-fw-version">—</span></div>
               <div class="info-item"><span class="info-label">mDNS</span><span class="info-val" id="info-mdns">—</span></div>
               <div class="info-item"><span class="info-label">MAC</span><span class="info-val" id="info-mac">—</span></div>
               <div class="info-item"><span class="info-label">UPTIME</span><span class="info-val" id="info-uptime">—</span></div>
@@ -299,6 +301,21 @@
         </div>
       </div>
 
+      <div class="card card--wide">
+        <div class="card-header">
+          <span class="card-icon">◷</span>
+          <span class="card-title">CHECK INTERVAL</span>
+        </div>
+        <div class="action-block">
+          <p class="action-desc">Time between automatic DDNS update checks (in seconds).</p>
+          <div class="inline-form">
+            <input type="number" class="field-input inline-input" id="ddns-interval" placeholder="300" min="30" />
+            <button class="btn-action btn-primary" id="btn-ddns-interval-save">SAVE INTERVAL</button>
+          </div>
+          <div class="action-result hidden" id="ddns-interval-result"></div>
+        </div>
+      </div>
+
     </div>
   </section>
 
@@ -355,6 +372,8 @@
           <div class="form-row">
             <button class="btn-action btn-primary" id="btn-gpio-set">SET PIN</button>
             <button class="btn-action btn-secondary" id="btn-gpio-read">READ PIN</button>
+            <button class="btn-action btn-primary" id="btn-gpio-pulse">PULSE 500ms</button>
+            <button class="btn-action btn-primary" id="btn-gpio-toggle">TOGGLE</button>
           </div>
           <div class="action-result hidden" id="gpio-result"></div>
         </div>
@@ -663,9 +682,66 @@
     </div>
   </section>
 
+  <!-- SYSTEM -->
+  <section class="tab-pane" id="tab-system">
+    <div class="cards-grid">
+
+      <div class="card card--wide">
+        <div class="card-header">
+          <span class="card-icon">◈</span>
+          <span class="card-title">FIRMWARE</span>
+        </div>
+        <div class="info-grid">
+          <div class="info-item"><span class="info-label">VERSION</span><span class="info-val" id="sys-version">—</span></div>
+          <div class="info-item"><span class="info-label">BUILD DATE</span><span class="info-val" id="sys-build">—</span></div>
+        </div>
+      </div>
+
+      <div class="card card--wide">
+        <div class="card-header">
+          <span class="card-icon">⟳</span>
+          <span class="card-title">REBOOT</span>
+        </div>
+        <div class="action-block">
+          <p class="action-desc">Restart the ESP8266 device. The connection will be lost temporarily.</p>
+          <button class="btn-action btn-primary" id="btn-reboot">⟳ REBOOT DEVICE</button>
+          <div class="action-result hidden" id="reboot-result"></div>
+        </div>
+      </div>
+
+      <div class="card card--wide">
+        <div class="card-header">
+          <span class="card-icon">⌦</span>
+          <span class="card-title">FACTORY RESET</span>
+        </div>
+        <div class="action-block">
+          <p class="action-desc">Reset ALL settings to factory defaults and reboot. This cannot be undone.</p>
+          <button class="btn-action btn-primary" id="btn-factory-reset">⚠ FACTORY RESET</button>
+          <div class="action-result hidden" id="factory-reset-result"></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
   <!-- TOOLS -->
   <section class="tab-pane" id="tab-tools">
     <div class="cards-grid">
+      <div class="card card--wide">
+        <div class="card-header">
+          <span class="card-icon">◉</span>
+          <span class="card-title">PING</span>
+        </div>
+        <div class="action-block">
+          <p class="action-desc">Ping a host from the device and show response time.</p>
+          <div class="inline-form">
+            <input type="text" class="field-input inline-input" id="ping-host" placeholder="Host or IP (e.g. 8.8.8.8)" />
+            <button class="btn-action btn-primary" id="btn-ping">PING</button>
+          </div>
+          <div class="action-result hidden" id="ping-result"></div>
+        </div>
+      </div>
+
       <div class="card card--wide">
         <div class="card-header">
           <span class="card-icon">⟁</span>
@@ -694,6 +770,25 @@
           <div class="api-list hidden" id="api-list"></div>
         </div>
       </div>
+
+      <div class="card card--wide">
+        <div class="card-header">
+          <span class="card-icon">⌦</span>
+          <span class="card-title">CONFIG BACKUP</span>
+        </div>
+        <div class="action-block">
+          <p class="action-desc">Export current device configuration as JSON, or import a previously exported config file.</p>
+          <div class="form-row">
+            <button class="btn-action btn-primary" id="btn-config-export">📥 EXPORT CONFIG</button>
+            <label class="btn-action btn-primary" id="btn-config-import-label" style="cursor:pointer;text-align:center">
+              📤 IMPORT CONFIG
+              <input type="file" id="btn-config-import" accept=".json" style="display:none" />
+            </label>
+          </div>
+          <div class="action-result hidden" id="config-import-result"></div>
+        </div>
+      </div>
+
     </div>
   </section>
 

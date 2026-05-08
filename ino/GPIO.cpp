@@ -73,3 +73,20 @@ void ledBlink(int times) {
   }
   ledOff();
 }
+
+String gpioPulse(int pin, int ms) {
+  if (pin < 0 || pin > 16) return "{\"error\":\"Invalid pin\"}";
+  pinMode(pin, OUTPUT);
+  digitalWrite(pin, HIGH);
+  delay(ms);
+  digitalWrite(pin, LOW);
+  return "{\"pin\":" + String(pin) + ",\"pulse_ms\":" + String(ms) + "}";
+}
+
+String gpioToggle(int pin) {
+  if (pin < 0 || pin > 16) return "{\"error\":\"Invalid pin\"}";
+  pinMode(pin, OUTPUT);
+  int val = digitalRead(pin);
+  digitalWrite(pin, val == HIGH ? LOW : HIGH);
+  return "{\"pin\":" + String(pin) + ",\"previous\":" + String(val) + ",\"current\":" + String(digitalRead(pin)) + "}";
+}

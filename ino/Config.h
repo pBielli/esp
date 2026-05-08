@@ -4,8 +4,10 @@
 #include <EEPROM.h>
 #include <Arduino.h>
 
-#define EEPROM_SIZE 1024
+#define EEPROM_SIZE 2048
 #define MAGIC "DDC"
+#define CORS_ORIGIN "https://pbielli.github.io"
+#define FIRMWARE_VERSION "1.0.0"
 
 struct Config {
   char wifi_ssid[32];
@@ -27,6 +29,7 @@ struct Config {
   char static_dns2[16];
   int pwm_pin;
   int use_custom_dns;
+  int ddns_check_interval;
   char ddns_upd_url[256];
   char magic[4];
 };

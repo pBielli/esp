@@ -6,6 +6,9 @@
 String getDDNSIP();
 String getPublicIP();
 String updateDDNS(String ip);
-void checkAndUpdateDDNS();
+bool checkDDNS();
+bool checkAndUpdateDDNS();
+String getCachedDDNSIP();
+String getCachedPublicIP();
 
 #endif

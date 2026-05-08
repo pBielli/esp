@@ -11,5 +11,7 @@ void ledOff();
 void ledBlink(int times);
 String analogReadPin();
 String analogWritePin(int pin, int value);
+String gpioPulse(int pin, int ms);
+String gpioToggle(int pin);
 
 #endif

@@ -12,16 +12,20 @@ String getDDNSIP() {
   return "";
 }
 
+String _cachedPublicIP = "";
+String _cachedDDNSIP = "";
+
+String getCachedPublicIP() { return _cachedPublicIP; }
+String getCachedDDNSIP() { return _cachedDDNSIP; }
+
 String getPublicIP() {
   HTTPClient http;
   WiFiClient c;
-  http.begin(c, "http://api.ipify.org");
+  http.begin(c, "https://api.ipify.org");
   int code = http.GET();
   String ip = (code == HTTP_CODE_OK) ? http.getString() : "";
   http.end();
-  Serial.println("Public IP: " + ip);
   ip.trim();
-  Serial.println("Public IP trimmed: " + ip);
   return ip;
 }
 
@@ -51,23 +55,35 @@ String updateDDNS(String ip) {
   return resp;
 }
 
-void checkAndUpdateDDNS() {
+bool checkDDNS() {
   String pub = getPublicIP();
   String ddns = getDDNSIP();
-  Serial.println("DDNS hostname: " + String(cfg.ddns_hostname));
-  Serial.println("DDNS: " + ddns + " Public: " + pub);
-  logAdd(millis(), "Check: DDNS=" + ddns + " Public=" + pub);
-
+  _cachedPublicIP = pub;
+  _cachedDDNSIP = ddns;
+  bool flag=false;
   if (ddns != "" && pub != "") {
     if (ddns != pub) {
       Serial.println("Mismatch! Updating...");
       logAdd(millis(), "DDNS mismatch detected");
       ledBlink(5);
       ledOn();
-      updateDDNS(pub);
     } else {
       Serial.println("Match");
       ledOff();
+      flag=true;
     }
   }
+  Serial.println("Check DDNS:"+ String(cfg.ddns_hostname) + " - DDNS=" + ddns + " Public=" + pub + "Match=" + (flag?"True":"False"));
+  logAdd(millis(), "Check DDNS:"+ String(cfg.ddns_hostname) + " - DDNS=" + ddns + " Public=" + pub + "Match=" + (flag?"True":"False"));
+  return flag;
+}
+bool checkAndUpdateDDNS() {
+  bool flag = checkDDNS();
+  if (!flag) {
+    String resp = updateDDNS(_cachedPublicIP);
+    flag=resp.indexOf("KO") == -1;
+    Serial.println("Update DDNS:"+ String(cfg.ddns_hostname) + " - Match:" + (flag ? "True" : "False")+" - Resp: " + resp );
+    logAdd(millis(), "Update DDNS:"+ String(cfg.ddns_hostname) + " - Match:" + (flag ? "True" : "False")+" - Resp: " + resp );
+  }
+  return flag;
 }

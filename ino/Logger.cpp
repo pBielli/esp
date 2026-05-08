@@ -16,13 +16,29 @@ void logAdd(unsigned long ms, String msg) {
   if (logCount < LOG_BUFFER_SIZE) logCount++;
 }
 
+String escapeJson(const String& s) {
+  String out = "";
+  for (size_t i = 0; i < s.length(); i++) {
+    char c = s.charAt(i);
+    switch (c) {
+      case '"': out += "\\\""; break;
+      case '\\': out += "\\\\"; break;
+      case '\n': out += "\\n"; break;
+      case '\r': out += "\\r"; break;
+      case '\t': out += "\\t"; break;
+      default: out += c;
+    }
+  }
+  return out;
+}
+
 String logGet() {
   String out = "[";
   int start = (logHead - logCount + LOG_BUFFER_SIZE) % LOG_BUFFER_SIZE;
   for (int i = 0; i < logCount; i++) {
     int idx = (start + i) % LOG_BUFFER_SIZE;
     unsigned long ms = logBuffer[idx].ms;
-    out += "{\"time\":" + String(ms) + ",\"msg\":\"" + String(logBuffer[idx].msg) + "\"}";
+    out += "{\"time\":" + String(ms) + ",\"msg\":\"" + escapeJson(String(logBuffer[idx].msg)) + "\"}";
     if (i < logCount - 1) out += ",";
   }
   out += "]";
