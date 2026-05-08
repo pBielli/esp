@@ -24,10 +24,11 @@ String getPublicIP() {
   WiFiClient c;
   while (urls.length() > 0) {
     int comma = urls.indexOf(',');
-    String url = (comma == -1) ? urls : urls.substring(0, comma);
+    String host = (comma == -1) ? urls : urls.substring(0, comma);
     urls = (comma == -1) ? "" : urls.substring(comma + 1);
-    url.trim();
-    if (url == "") continue;
+    host.trim();
+    if (host == "") continue;
+    String url = "https://" + host;
     http.begin(c, url);
     int code = http.GET();
     String ip = (code == HTTP_CODE_OK) ? http.getString() : "";
@@ -38,6 +39,31 @@ String getPublicIP() {
     }
     Serial.println("getPublicIP: " + url + " failed (code=" + String(code) + "), trying next...");
     logAdd(millis(), "Public IP server failed: " + url);
+  }
+  return "";
+}
+
+String getPublicIP(int serverIdx) {
+  String urls = String(cfg.public_ip_urls);
+  HTTPClient http;
+  WiFiClient c;
+  int idx = 0;
+  while (urls.length() > 0) {
+    int comma = urls.indexOf(',');
+    String host = (comma == -1) ? urls : urls.substring(0, comma);
+    urls = (comma == -1) ? "" : urls.substring(comma + 1);
+    host.trim();
+    if (host == "") continue;
+    if (idx == serverIdx) {
+      String url = "https://" + host;
+      http.begin(c, url);
+      int code = http.GET();
+      String ip = (code == HTTP_CODE_OK) ? http.getString() : "";
+      http.end();
+      ip.trim();
+      return ip;
+    }
+    idx++;
   }
   return "";
 }

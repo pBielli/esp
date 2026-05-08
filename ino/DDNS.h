@@ -5,6 +5,7 @@
 
 String getDDNSIP();
 String getPublicIP();
+String getPublicIP(int serverIdx);
 String updateDDNS(String ip);
 bool checkDDNS();
 bool checkAndUpdateDDNS();

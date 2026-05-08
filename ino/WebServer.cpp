@@ -120,6 +120,7 @@ void setupRoutes() {
     a.add("/api/config/import (POST)");
     a.add("/api/ddns/interval (POST)");
     a.add("/api/ddns/ipurls (GET, POST: urls)");
+    a.add("/api/ddns/refresh-ip?idx=N");
     a.add("/api/gpio/pulse (POST: pin,ms)");
     a.add("/api/gpio/toggle (POST: pin)");
     String r; serializeJson(doc, r);
@@ -239,9 +240,50 @@ void setupRoutes() {
   server.on("/api/ddns/ipurls", HTTP_POST, []() {
     if (!checkAuth()) return;
     String urls = server.arg("urls");
-    if (urls != "") strncpy(cfg.public_ip_urls, urls.c_str(), sizeof(cfg.public_ip_urls) - 1);
+    if (urls != "") {
+      urls.replace("https://", "");
+      urls.replace("http://", "");
+      strncpy(cfg.public_ip_urls, urls.c_str(), sizeof(cfg.public_ip_urls) - 1);
+    }
     storageSave();
     server.send(200, "application/json", "{\"status\":\"saved\",\"public_ip_urls\":\"" + String(cfg.public_ip_urls) + "\"}");
+  });
+
+  addOptions("/api/ddns/refresh-ip");
+  server.on("/api/ddns/refresh-ip", []() {
+    sendCORS();
+    String idxStr = server.arg("idx");
+    String ip, serverUsed;
+    bool success = false;
+    if (idxStr != "") {
+      int idx = idxStr.toInt();
+      String urls = String(cfg.public_ip_urls);
+      int cur = 0;
+      while (urls.length() > 0) {
+        int comma = urls.indexOf(',');
+        String host = (comma == -1) ? urls : urls.substring(0, comma);
+        urls = (comma == -1) ? "" : urls.substring(comma + 1);
+        host.trim();
+        if (host == "") continue;
+        if (cur == idx) { serverUsed = host; break; }
+        cur++;
+      }
+      ip = getPublicIP(idx);
+      if (ip != "") success = true;
+    } else {
+      ip = getPublicIP();
+      if (ip != "") success = true;
+      String urls = String(cfg.public_ip_urls);
+      int comma = urls.indexOf(',');
+      serverUsed = (comma == -1) ? urls : urls.substring(0, comma);
+      serverUsed.trim();
+    }
+    JsonDocument doc;
+    doc["ip"] = ip;
+    doc["server"] = serverUsed;
+    doc["success"] = success;
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
   });
 
   addOptions("/api/resolve");

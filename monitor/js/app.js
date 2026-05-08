@@ -367,7 +367,14 @@ async function loadDdnsConfig() {
     if (info.ddns_domain) $('ddns-domain').value = info.ddns_domain;
     if (info.ddns_upd_url) $('ddns-upd-url').value = info.ddns_upd_url;
     if (info.ddns_check_interval != null) $('ddns-interval').value = info.ddns_check_interval;
-    if (info.public_ip_urls) $('ddns-ipurls').value = info.public_ip_urls;
+    if (info.public_ip_urls) {
+      const parts = info.public_ip_urls.split(',');
+      $('ddns-ipurl-1').value = parts[0] || '';
+      $('ddns-ipurl-2').value = parts[1] || '';
+      const sel = $('ipcheck-server');
+      sel.options[0] = new Option(parts[0] || 'Server 1', 0);
+      sel.options[1] = new Option(parts[1] || 'Server 2', 1);
+    }
   } catch {}
 }
 
@@ -394,16 +401,49 @@ $('btn-ddns-config-save').addEventListener('click', async () => {
 
 // ── DDNS IP URLs ──────────────────────────────────────────
 $('btn-ddns-ipurls-save').addEventListener('click', async () => {
-  const urls = $('ddns-ipurls').value.trim();
-  if (!urls) { toast('Enter at least one URL', 'warning'); return; }
+  const s1 = $('ddns-ipurl-1').value.trim();
+  const s2 = $('ddns-ipurl-2').value.trim();
+  if (!s1 && !s2) { toast('Enter at least one server', 'warning'); return; }
+  const urls = s2 ? s1 + ',' + s2 : s1;
   const body = new URLSearchParams({ urls }).toString();
   try {
     const data = await apiFetch('/api/ddns/ipurls', { method: 'POST', auth: true, body });
+    const parts = data.public_ip_urls.split(',');
+    $('ddns-ipurl-1').value = parts[0] || '';
+    $('ddns-ipurl-2').value = parts[1] || '';
+    const sel = $('ipcheck-server');
+    sel.options[0] = new Option(parts[0] || 'Server 1', 0);
+    sel.options[1] = new Option(parts[1] || 'Server 2', 1);
     showResult('ddns-ipurls-result', `IP URLs saved: ${data.public_ip_urls}`, 'success');
     toast('IP URLs saved', 'success');
   } catch (err) {
     showResult('ddns-ipurls-result', `Error: ${err.message}`, 'error');
     toast('IP URLs save failed', 'error');
+  }
+});
+
+// ── Public IP Check ──────────────────────────────────────
+$('btn-ipcheck').addEventListener('click', async () => {
+  const idx = $('ipcheck-server').value;
+  const btn = $('btn-ipcheck');
+  btn.disabled = true;
+  btn.textContent = '⟳ CHECKING…';
+  try {
+    const data = await apiFetch('/api/ddns/refresh-ip?idx=' + idx);
+    const cls = data.success ? 'success' : 'error';
+    const serverName = data.server || '—';
+    const ipText = data.ip || 'FAILED';
+    showResult('ipcheck-result',
+      `Server: ${serverName} → ${ipText} [${data.success ? 'OK' : 'FAIL'}]`,
+      cls);
+    if (data.success) toast('Public IP: ' + data.ip, 'success');
+    else toast('Public IP check failed', 'error');
+  } catch (err) {
+    showResult('ipcheck-result', `Error: ${err.message}`, 'error');
+    toast('IP check failed', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'CHECK IP';
   }
 });
 

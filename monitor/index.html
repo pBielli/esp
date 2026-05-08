@@ -52,10 +52,10 @@
           <label class="field-label" for="input-ip">DEVICE IP / HOST</label>
           <div class="field-row">
             <span class="field-prefix">//</span>
-            <input id="input-ip" type="text" class="field-input" placeholder="192.168.1.x" autocomplete="off"
-              spellcheck="false" />
-          </div>
-          <div class="field-hint">e.g. 192.168.1.42 or ddns-checker.local</div>
+      <input id="input-ip" type="text" class="field-input" placeholder="192.168.1.x" autocomplete="off"
+        spellcheck="false" />
+    </div>
+    <div class="field-hint">e.g. 192.168.1.42 or ddns-checker.local (add :port if needed)</div>
         </div>
         <div class="field-group">
           <label class="field-label" for="input-pass">ADMIN PASSWORD</label>
@@ -280,11 +280,21 @@
           </div>
           <div class="form-row">
             <div class="form-field">
-              <label class="field-label">PUBLIC IP URLS (comma-separated, tried in order)</label>
+              <label class="field-label">PUBLIC IP SERVER 1 (main, HTTPS implied)</label>
               <div class="field-row">
                 <span class="field-prefix">⌁</span>
-                <input type="text" class="field-input" id="ddns-ipurls"
-                  placeholder="https://api.ipify.org,https://api.my-ip.io/ip" />
+                <input type="text" class="field-input" id="ddns-ipurl-1"
+                  placeholder="api.ipify.org" />
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label class="field-label">PUBLIC IP SERVER 2 (fallback, HTTPS implied)</label>
+              <div class="field-row">
+                <span class="field-prefix">⌁</span>
+                <input type="text" class="field-input" id="ddns-ipurl-2"
+                  placeholder="api.my-ip.io/ip" />
               </div>
             </div>
           </div>
@@ -296,6 +306,24 @@
             <button class="btn-action btn-primary" id="btn-ddns-config-save">SAVE DDNS CONFIG</button>
           </div>
           <div class="action-result hidden" id="ddns-config-result"></div>
+        </div>
+      </div>
+
+      <div class="card card--wide">
+        <div class="card-header">
+          <span class="card-icon">◈</span>
+          <span class="card-title">PUBLIC IP CHECK</span>
+        </div>
+        <div class="action-block">
+          <p class="action-desc">Select a server and fetch your current public IP address.</p>
+          <div class="inline-form">
+            <select class="field-input inline-input" id="ipcheck-server">
+              <option value="0">Server 1</option>
+              <option value="1">Server 2</option>
+            </select>
+            <button class="btn-action btn-primary" id="btn-ipcheck">CHECK IP</button>
+          </div>
+          <div class="action-result hidden" id="ipcheck-result"></div>
         </div>
       </div>
 
