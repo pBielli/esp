@@ -8,6 +8,7 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <WiFiClient.h>
+#include <WiFiClientSecure.h>
 #include "WebServer_index.h"
 ESP8266WebServer server(80);
 
@@ -304,10 +305,21 @@ void setupRoutes() {
     if (!checkAuth()) return;
     String url = server.arg("url");
     if (url == "") { server.send(400, "application/json", "{\"error\":\"Missing url\"}"); return; }
-    HTTPClient http; WiFiClient c;
-    http.begin(c, url); int code = http.GET();
-    String payload = (code == HTTP_CODE_OK) ? http.getString() : "Error: " + String(code);
-    http.end();
+    HTTPClient http; int code; String payload;
+    if (url.startsWith("https://")) {
+      WiFiClientSecure c;
+      c.setInsecure();
+      http.begin(c, url);
+      code = http.GET();
+      payload = (code == HTTP_CODE_OK) ? http.getString() : "Error: " + String(code);
+      http.end();
+    } else {
+      WiFiClient c;
+      http.begin(c, url);
+      code = http.GET();
+      payload = (code == HTTP_CODE_OK) ? http.getString() : "Error: " + String(code);
+      http.end();
+    }
     server.send(200, "text/plain", payload);
   });
 

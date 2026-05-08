@@ -4,8 +4,10 @@
 
 String pingHost(String host) {
   IPAddress ip;
-  if (!WiFi.hostByName(host.c_str(), ip)) {
-    return "{\"host\":\"" + host + "\",\"success\":false,\"error\":\"DNS resolution failed\"}";
+  if (!ip.fromString(host)) {
+    if (!WiFi.hostByName(host.c_str(), ip)) {
+      return "{\"host\":\"" + host + "\",\"success\":false,\"error\":\"DNS resolution failed\"}";
+    }
   }
   bool success = Ping.ping(ip, 3);
   float avg = Ping.averageTime();
