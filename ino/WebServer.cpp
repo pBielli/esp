@@ -71,23 +71,7 @@ void setupRoutes() {
     sendCORS();
     server.send(200, "text/html", index_page);
   });
-  // server.on("/", []() {
-  //   sendCORS();
-  //   String html = "<html><head><title>" + String(cfg.mdns_name) + "</title></head><body>";
-  //   html += "<h1>" + String(cfg.mdns_name) + "</h1>";
-  //   html += "<p>MAC: " + WiFi.macAddress() + "</p>";
-  //   html += "<p>SSID: " + WiFi.SSID() + "</p>";
-  //   html += "<p>RSSI: " + String(WiFi.RSSI()) + " dBm</p>";
-  //   html += "<p>mDNS: " + String(cfg.mdns_name) + ".local</p>";
-  //   html += "<p>DDNS: " + String(cfg.ddns_hostname) + "</p>";
-  //   IPAddress dip;
-  //   if (WiFi.hostByName(cfg.ddns_hostname, dip)) html += "<p>DDNS IP: " + dip.toString() + "</p>";
-  //   String pub = getPublicIP();
-  //   if (pub != "") html += "<p>Public IP: " + pub + "</p>";
-  //   html += "<p><a href='/api/help'><button>API Help</button></a></p>";
-  //   html += "</body></html>";
-  //   server.send(200, "text/html", html);
-  // });
+
 
   addOptions("/api/help");
   server.on("/api/help", []() {
@@ -416,6 +400,11 @@ void setupRoutes() {
     if (dns2 != "") strncpy(cfg.static_dns2, dns2.c_str(), 15);
     if (ucd != "") cfg.use_custom_dns = (ucd == "1" || ucd == "true") ? 1 : 0;
     storageSave();
+    if (cfg.use_custom_dns) {
+      applyNetworkConfig();
+    } else {
+      WiFi.disconnect();
+    }
     server.send(200, "application/json", "{\"status\":\"saved\",\"dns1\":\"" + String(cfg.static_dns1) + "\",\"dns2\":\"" + String(cfg.static_dns2) + "\",\"use_custom_dns\":" + String(cfg.use_custom_dns) + "}");
   });
 

@@ -738,7 +738,7 @@ $('btn-dns-save').addEventListener('click', async () => {
   if (dns2) body.append('dns2', dns2);
   try {
     const data = await apiFetch('/api/dns/set', { method: 'POST', auth: true, body: body.toString() });
-    showResult('dns-result', `DNS saved: ${data.dns1}, ${data.dns2}. Reconnect to apply.`, 'success');
+    showResult('dns-result', `DNS saved: ${data.dns1}, ${data.dns2}. Applied ${data.use_custom_dns ? 'custom' : 'DHCP'} DNS.`, 'success');
     updateDnsToggleUI(data.use_custom_dns === 1);
     toast('DNS saved', 'success');
   } catch (err) {

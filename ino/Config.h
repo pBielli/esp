@@ -38,5 +38,6 @@ void storageLoad();
 void storageSave();
 void storageReset();
 bool storageInitialized();
+void applyNetworkConfig();
 
 #endif
