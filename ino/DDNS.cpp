@@ -19,30 +19,42 @@ String getPublicIP() {
   int code = http.GET();
   String ip = (code == HTTP_CODE_OK) ? http.getString() : "";
   http.end();
+  Serial.println("Public IP: " + ip);
   ip.trim();
+  Serial.println("Public IP trimmed: " + ip);
   return ip;
 }
 
 String updateDDNS(String ip) {
   HTTPClient http;
   WiFiClient c;
-  String url = "http://www.duckdns.org/update?domains=" + String(cfg.duckdns_domain) + "&token=" + String(cfg.duckdns_token) + "&ip=" + ip;
+  String url = String(cfg.ddns_upd_url);
+  url.replace("$domain", String(cfg.ddns_domain));
+  url.replace("$token", String(cfg.duckdns_token));
+  url.replace("$ip", ip);
   http.begin(c, url);
   int code = http.GET();
   String resp = "";
   if (code == HTTP_CODE_OK) {
     resp = http.getString();
     resp.trim();
-    logAdd(millis(), "DDNS updated: " + resp);
-    Serial.println("DDNS: " + resp);
+    //se risposta contiene "KO" allora c'è stato un errore, altrimenti è andato tutto bene
+    if(resp.indexOf("KO") == -1){
+      logAdd(millis(), "DDNS updated: " + resp);
+      Serial.println("DDNS: " + resp);
+    } else {
+      logAdd(millis(), "DDNS update failed: " + resp);
+      Serial.println("DDNS update failed: " + resp);
+    }
   }
   http.end();
   return resp;
 }
 
 void checkAndUpdateDDNS() {
-  String ddns = getDDNSIP();
   String pub = getPublicIP();
+  String ddns = getDDNSIP();
+  Serial.println("DDNS hostname: " + String(cfg.ddns_hostname));
   Serial.println("DDNS: " + ddns + " Public: " + pub);
   logAdd(millis(), "Check: DDNS=" + ddns + " Public=" + pub);
 

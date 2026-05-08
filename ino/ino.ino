@@ -16,13 +16,14 @@
 #include "WebServer.h"
 
 unsigned long lastCheck = 0;
-
+bool flag_firtstRun = true;
 void setup() {
   Serial.begin(115200);
   Serial.println("\n");
 
   storageBegin();
   storageLoad();
+    // storageReset();
   if (!storageInitialized()) {
     storageReset();
     logAdd(millis(), "Config reset to default");
@@ -39,6 +40,13 @@ void setup() {
     dns1.fromString(cfg.static_dns1);
     dns2.fromString(cfg.static_dns2);
     WiFi.config(ip, gw, subnet, dns1, dns2);
+  } else if (cfg.use_custom_dns) {
+    IPAddress dns1, dns2;
+    bool hasDns1 = dns1.fromString(cfg.static_dns1);
+    bool hasDns2 = dns2.fromString(cfg.static_dns2);
+    if (hasDns1 || hasDns2) {
+      WiFi.config(0U, 0U, 0U, dns1, dns2);
+    }
   }
 
   WiFi.begin(cfg.wifi_ssid, cfg.wifi_password);
@@ -46,13 +54,6 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
   Serial.println(" " + WiFi.localIP().toString());
   logAdd(millis(), "WiFi connected: " + WiFi.localIP().toString());
-
-  if (!cfg.use_static_ip) {
-    IPAddress dns1, dns2;
-    if (dns1.fromString(cfg.static_dns1) || dns2.fromString(cfg.static_dns2)) {
-      WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, dns1, dns2);
-    }
-  }
 
   ntpBegin();
   logAdd(millis(), "Time: " + ntpGetTime());
@@ -77,7 +78,16 @@ void loop() {
     logAdd(millis(), "WiFi reconnected: " + WiFi.localIP().toString());
   }
 
-  if (millis() - lastCheck > 300000) {
+  if (millis() - lastCheck > 300000 || flag_firtstRun) { // Check every 5 minutes
+    if(flag_firtstRun){
+      flag_firtstRun = false;
+  IPAddress test_ip;
+  Serial.println("Checking DDNS hostname: " + String(cfg.ddns_hostname));
+  if (WiFi.hostByName(cfg.ddns_hostname, test_ip)) {
+    Serial.println("TEST:DDNS IP: " + test_ip.toString());
+  } else {
+    Serial.println("TEST:Failed to resolve DDNS hostname");
+    }}
     lastCheck = millis();
     checkAndUpdateDDNS();
   }

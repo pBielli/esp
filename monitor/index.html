@@ -216,6 +216,7 @@
   <!-- DDNS -->
   <section class="tab-pane" id="tab-ddns">
     <div class="cards-grid">
+
       <div class="card card--wide">
         <div class="card-header">
           <span class="card-icon">⬡</span>
@@ -228,6 +229,54 @@
             <span>⟳</span> FORCE UPDATE
           </button>
           <div class="action-result hidden" id="ddns-update-result"></div>
+        </div>
+      </div>
+
+      <div class="card card--wide">
+        <div class="card-header">
+          <span class="card-icon">⚙</span>
+          <span class="card-title">DDNS CONFIGURATION</span>
+        </div>
+        <div class="action-block">
+          <div class="form-row">
+            <div class="form-field">
+              <label class="field-label">DDNS HOSTNAME</label>
+              <div class="field-row">
+                <span class="field-prefix">⌁</span>
+                <input type="text" class="field-input" id="ddns-hostname" placeholder="example.duckdns.org" />
+              </div>
+            </div>
+            <div class="form-field">
+              <label class="field-label">DOMAIN</label>
+              <div class="field-row">
+                <span class="field-prefix">◈</span>
+                <input type="text" class="field-input" id="ddns-domain" placeholder="example" />
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label class="field-label">TOKEN</label>
+              <div class="field-row">
+                <span class="field-prefix">##</span>
+                <input type="password" class="field-input" id="ddns-token" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label class="field-label">UPDATE URL (use $domain, $token, $ip)</label>
+              <div class="field-row">
+                <span class="field-prefix">⌁</span>
+                <input type="text" class="field-input" id="ddns-upd-url"
+                  placeholder="http://www.duckdns.org/update?domains=$domain&token=$token&ip=$ip" />
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <button class="btn-action btn-primary" id="btn-ddns-config-save">SAVE DDNS CONFIG</button>
+          </div>
+          <div class="action-result hidden" id="ddns-config-result"></div>
         </div>
       </div>
 
@@ -246,6 +295,7 @@
           <div class="action-result hidden" id="resolve-result"></div>
         </div>
       </div>
+
     </div>
   </section>
 
@@ -528,6 +578,20 @@
           <span class="card-title">DNS CONFIGURATION</span>
         </div>
         <div class="action-block">
+          <div class="form-row">
+            <div class="form-field">
+              <label class="toggle-label">
+                <span class="toggle-text">USE CUSTOM DNS</span>
+                <span class="toggle-switch" id="dns-custom-toggle">
+                  <span class="toggle-slider"></span>
+                </span>
+              </label>
+            </div>
+          </div>
+          <div class="dns-warning hidden" id="dns-warning">
+            <span class="warning-icon">⚠</span>
+            Custom DNS is disabled — values are saved but will NOT be used. Enable the toggle above to apply them on next boot.
+          </div>
           <div class="form-row">
             <div class="form-field">
               <label class="field-label">DNS 1</label>

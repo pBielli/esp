@@ -69,20 +69,7 @@ void setupRoutes() {
   addOptions("/");
   server.on("/", []() {
     sendCORS();
-    String html = "<html><head><title>" + String(cfg.mdns_name) + "</title></head><body>";
-    html += "<h1>" + String(cfg.mdns_name) + "</h1>";
-    html += "<p>MAC: " + WiFi.macAddress() + "</p>";
-    html += "<p>SSID: " + WiFi.SSID() + "</p>";
-    html += "<p>RSSI: " + String(WiFi.RSSI()) + " dBm</p>";
-    html += "<p>mDNS: " + String(cfg.mdns_name) + ".local</p>";
-    html += "<p>DDNS: " + String(cfg.ddns_hostname) + "</p>";
-    IPAddress dip;
-    if (WiFi.hostByName(cfg.ddns_hostname, dip)) html += "<p>DDNS IP: " + dip.toString() + "</p>";
-    String pub = getPublicIP();
-    if (pub != "") html += "<p>Public IP: " + pub + "</p>";
-    html += "<p><a href='/api/help'><button>API Help</button></a></p>";
-    html += "</body></html>";
-    server.send(200, "text/html", html);
+    server.send(200, "text/html", index_page);
   });
   // server.on("/", []() {
   //   sendCORS();
@@ -114,6 +101,7 @@ void setupRoutes() {
     a.add("/api/log");
     a.add("/api/blink?times=N");
     a.add("/api/ddns/update");
+    a.add("/api/ddns/config (POST: hostname,domain,token,upd_url)");
     a.add("/api/resolve?host=x");
     a.add("/api/curl?url=x");
     a.add("/api/gpio/info");
@@ -165,6 +153,8 @@ void setupRoutes() {
     doc["static_dns1"] = cfg.static_dns1;
     doc["static_dns2"] = cfg.static_dns2;
     doc["pwm_pin"] = cfg.pwm_pin;
+    doc["use_custom_dns"] = cfg.use_custom_dns;
+    doc["ddns_upd_url"] = cfg.ddns_upd_url;
     IPAddress dip;
     if (WiFi.hostByName(cfg.ddns_hostname, dip)) doc["ddns_ip"] = dip.toString();
     String pub = getPublicIP();
@@ -220,6 +210,21 @@ void setupRoutes() {
     String ip = getPublicIP();
     String resp = updateDDNS(ip);
     server.send(200, "application/json", "{\"status\":\"updated\",\"response\":\"" + resp + "\"}");
+  });
+
+  addOptions("/api/ddns/config");
+  server.on("/api/ddns/config", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    String hostname = server.arg("hostname");
+    String domain = server.arg("domain");
+    String token = server.arg("token");
+    String upd_url = server.arg("upd_url");
+    if (hostname != "") strncpy(cfg.ddns_hostname, hostname.c_str(), 63);
+    if (domain != "") strncpy(cfg.duckdns_domain, domain.c_str(), 31);
+    if (token != "") strncpy(cfg.duckdns_token, token.c_str(), 47);
+    if (upd_url != "") strncpy(cfg.ddns_upd_url, upd_url.c_str(), 255);
+    storageSave();
+    server.send(200, "application/json", "{\"status\":\"saved\",\"ddns_hostname\":\"" + String(cfg.ddns_hostname) + "\",\"ddns_domain\":\"" + String(cfg.duckdns_domain) + "\"}");
   });
 
   addOptions("/api/resolve");
@@ -405,10 +410,12 @@ void setupRoutes() {
     if (!checkAuth()) return;
     String dns1 = server.arg("dns1");
     String dns2 = server.arg("dns2");
+    String ucd = server.arg("use_custom_dns");
     if (dns1 != "") strncpy(cfg.static_dns1, dns1.c_str(), 15);
     if (dns2 != "") strncpy(cfg.static_dns2, dns2.c_str(), 15);
+    if (ucd != "") cfg.use_custom_dns = (ucd == "1" || ucd == "true") ? 1 : 0;
     storageSave();
-    server.send(200, "application/json", "{\"status\":\"saved\",\"dns1\":\"" + String(cfg.static_dns1) + "\",\"dns2\":\"" + String(cfg.static_dns2) + "\"}");
+    server.send(200, "application/json", "{\"status\":\"saved\",\"dns1\":\"" + String(cfg.static_dns1) + "\",\"dns2\":\"" + String(cfg.static_dns2) + "\",\"use_custom_dns\":" + String(cfg.use_custom_dns) + "}");
   });
 
   addOptions("/api/ip/config");

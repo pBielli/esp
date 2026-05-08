@@ -333,6 +333,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (btn.dataset.tab === 'gpio') loadGpioInfo();
     if (btn.dataset.tab === 'log') loadLog();
     if (btn.dataset.tab === 'led') loadLedInvert();
+    if (btn.dataset.tab === 'ddns') loadDdnsConfig();
     if (btn.dataset.tab === 'network') loadNetworkTab();
   });
 });
@@ -352,6 +353,37 @@ $('btn-ddns-update').addEventListener('click', async () => {
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<span>⟳</span> FORCE UPDATE';
+  }
+});
+
+// ── DDNS Config ────────────────────────────────────────────
+async function loadDdnsConfig() {
+  try {
+    const info = await apiFetch('/api/info');
+    if (info.ddns) $('ddns-hostname').value = info.ddns;
+    if (info.ddns) $('ddns-hostname').placeholder = info.ddns;
+    if (info.ddns_upd_url) $('ddns-upd-url').value = info.ddns_upd_url;
+  } catch {}
+}
+
+$('btn-ddns-config-save').addEventListener('click', async () => {
+  const hostname = $('ddns-hostname').value.trim();
+  const domain   = $('ddns-domain').value.trim();
+  const token    = $('ddns-token').value.trim();
+  const upd_url  = $('ddns-upd-url').value.trim();
+  if (!hostname && !domain && !token && !upd_url) { toast('Fill at least one field', 'warning'); return; }
+  const body = new URLSearchParams();
+  if (hostname) body.append('hostname', hostname);
+  if (domain)   body.append('domain', domain);
+  if (token)    body.append('token', token);
+  if (upd_url)  body.append('upd_url', upd_url);
+  try {
+    const data = await apiFetch('/api/ddns/config', { method: 'POST', auth: true, body: body.toString() });
+    showResult('ddns-config-result', `DDNS saved: ${data.ddns_hostname}`, 'success');
+    toast('DDNS config saved', 'success');
+  } catch (err) {
+    showResult('ddns-config-result', `Error: ${err.message}`, 'error');
+    toast('DDNS config failed', 'error');
   }
 });
 
@@ -681,17 +713,32 @@ $('btn-mdns-save').addEventListener('click', async () => {
   }
 });
 
+// ── DNS Custom Toggle ──────────────────────────────────────
+function updateDnsToggleUI(enabled) {
+  const toggle = $('dns-custom-toggle');
+  toggle.classList.toggle('active', enabled);
+  const warn = $('dns-warning');
+  warn.classList.toggle('hidden', enabled);
+}
+
+$('dns-custom-toggle').addEventListener('click', () => {
+  const enabled = $('dns-custom-toggle').classList.contains('active');
+  updateDnsToggleUI(!enabled);
+});
+
 // ── DNS Save ───────────────────────────────────────────────
 $('btn-dns-save').addEventListener('click', async () => {
   const dns1 = $('dns1').value.trim();
   const dns2 = $('dns2').value.trim();
   if (!dns1 && !dns2) { toast('Enter at least one DNS server', 'warning'); return; }
-  const body = new URLSearchParams();
+  const use_custom_dns = $('dns-custom-toggle').classList.contains('active') ? '1' : '0';
+  const body = new URLSearchParams({ use_custom_dns });
   if (dns1) body.append('dns1', dns1);
   if (dns2) body.append('dns2', dns2);
   try {
     const data = await apiFetch('/api/dns/set', { method: 'POST', auth: true, body: body.toString() });
     showResult('dns-result', `DNS saved: ${data.dns1}, ${data.dns2}. Reconnect to apply.`, 'success');
+    updateDnsToggleUI(data.use_custom_dns === 1);
     toast('DNS saved', 'success');
   } catch (err) {
     showResult('dns-result', `Error: ${err.message}`, 'error');
@@ -810,6 +857,7 @@ async function loadNetworkTab() {
     if (info.static_dns2) $('dns2').value = info.static_dns2;
     if (info.dns1) $('dns1').placeholder = info.dns1;
     if (info.dns2) $('dns2').placeholder = info.dns2;
+    if (info.use_custom_dns != null) updateDnsToggleUI(info.use_custom_dns === 1);
     if (info.use_static_ip != null) {
       const isStatic = info.use_static_ip === 1;
       $('ip-mode-toggle').classList.toggle('active', isStatic);

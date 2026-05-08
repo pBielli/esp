@@ -4,7 +4,7 @@
 #include <EEPROM.h>
 #include <Arduino.h>
 
-#define EEPROM_SIZE 512
+#define EEPROM_SIZE 1024
 #define MAGIC "DDC"
 
 struct Config {
@@ -13,8 +13,8 @@ struct Config {
   char mdns_name[32];
   char admin_password[32];
   char ddns_hostname[64];
-  char duckdns_token[48];
-  char duckdns_domain[32];
+  char ddns_token[48];
+  char ddns_domain[32];
   int led_pin;
   int tz_offset;
   char ntp_server[64];
@@ -26,6 +26,8 @@ struct Config {
   char static_dns1[16];
   char static_dns2[16];
   int pwm_pin;
+  int use_custom_dns;
+  char ddns_upd_url[256];
   char magic[4];
 };
 

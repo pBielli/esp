@@ -767,7 +767,8 @@ body {
 }
 
 /* WiFi */
-.wifi-warning {
+.wifi-warning,
+.dns-warning {
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
