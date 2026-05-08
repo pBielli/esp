@@ -279,6 +279,20 @@
             </div>
           </div>
           <div class="form-row">
+            <div class="form-field">
+              <label class="field-label">PUBLIC IP URLS (comma-separated, tried in order)</label>
+              <div class="field-row">
+                <span class="field-prefix">⌁</span>
+                <input type="text" class="field-input" id="ddns-ipurls"
+                  placeholder="https://api.ipify.org,https://api.my-ip.io/ip" />
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <button class="btn-action btn-primary" id="btn-ddns-ipurls-save">SAVE IP URLS</button>
+          </div>
+          <div class="action-result hidden" id="ddns-ipurls-result"></div>
+          <div class="form-row">
             <button class="btn-action btn-primary" id="btn-ddns-config-save">SAVE DDNS CONFIG</button>
           </div>
           <div class="action-result hidden" id="ddns-config-result"></div>

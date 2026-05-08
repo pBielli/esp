@@ -19,14 +19,27 @@ String getCachedPublicIP() { return _cachedPublicIP; }
 String getCachedDDNSIP() { return _cachedDDNSIP; }
 
 String getPublicIP() {
+  String urls = String(cfg.public_ip_urls);
   HTTPClient http;
   WiFiClient c;
-  http.begin(c, "https://api.ipify.org");
-  int code = http.GET();
-  String ip = (code == HTTP_CODE_OK) ? http.getString() : "";
-  http.end();
-  ip.trim();
-  return ip;
+  while (urls.length() > 0) {
+    int comma = urls.indexOf(',');
+    String url = (comma == -1) ? urls : urls.substring(0, comma);
+    urls = (comma == -1) ? "" : urls.substring(comma + 1);
+    url.trim();
+    if (url == "") continue;
+    http.begin(c, url);
+    int code = http.GET();
+    String ip = (code == HTTP_CODE_OK) ? http.getString() : "";
+    http.end();
+    ip.trim();
+    if (ip != "") {
+      return ip;
+    }
+    Serial.println("getPublicIP: " + url + " failed (code=" + String(code) + "), trying next...");
+    logAdd(millis(), "Public IP server failed: " + url);
+  }
+  return "";
 }
 
 String updateDDNS(String ip) {

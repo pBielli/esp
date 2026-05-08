@@ -367,6 +367,7 @@ async function loadDdnsConfig() {
     if (info.ddns_domain) $('ddns-domain').value = info.ddns_domain;
     if (info.ddns_upd_url) $('ddns-upd-url').value = info.ddns_upd_url;
     if (info.ddns_check_interval != null) $('ddns-interval').value = info.ddns_check_interval;
+    if (info.public_ip_urls) $('ddns-ipurls').value = info.public_ip_urls;
   } catch {}
 }
 
@@ -388,6 +389,21 @@ $('btn-ddns-config-save').addEventListener('click', async () => {
   } catch (err) {
     showResult('ddns-config-result', `Error: ${err.message}`, 'error');
     toast('DDNS config failed', 'error');
+  }
+});
+
+// ── DDNS IP URLs ──────────────────────────────────────────
+$('btn-ddns-ipurls-save').addEventListener('click', async () => {
+  const urls = $('ddns-ipurls').value.trim();
+  if (!urls) { toast('Enter at least one URL', 'warning'); return; }
+  const body = new URLSearchParams({ urls }).toString();
+  try {
+    const data = await apiFetch('/api/ddns/ipurls', { method: 'POST', auth: true, body });
+    showResult('ddns-ipurls-result', `IP URLs saved: ${data.public_ip_urls}`, 'success');
+    toast('IP URLs saved', 'success');
+  } catch (err) {
+    showResult('ddns-ipurls-result', `Error: ${err.message}`, 'error');
+    toast('IP URLs save failed', 'error');
   }
 });
 

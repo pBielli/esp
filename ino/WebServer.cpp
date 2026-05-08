@@ -119,6 +119,7 @@ void setupRoutes() {
     a.add("/api/config/export");
     a.add("/api/config/import (POST)");
     a.add("/api/ddns/interval (POST)");
+    a.add("/api/ddns/ipurls (GET, POST: urls)");
     a.add("/api/gpio/pulse (POST: pin,ms)");
     a.add("/api/gpio/toggle (POST: pin)");
     String r; serializeJson(doc, r);
@@ -156,6 +157,7 @@ void setupRoutes() {
     doc["use_custom_dns"] = cfg.use_custom_dns;
     doc["ddns_check_interval"] = cfg.ddns_check_interval;
     doc["ddns_upd_url"] = cfg.ddns_upd_url;
+    doc["public_ip_urls"] = cfg.public_ip_urls;
     doc["firmware"] = FIRMWARE_VERSION;
     String ddnsIp = getCachedDDNSIP();
     if (ddnsIp != "") doc["ddns_ip"] = ddnsIp;
@@ -227,6 +229,19 @@ void setupRoutes() {
     if (upd_url != "") strncpy(cfg.ddns_upd_url, upd_url.c_str(), sizeof(cfg.ddns_upd_url) - 1);
     storageSave();
     server.send(200, "application/json", "{\"status\":\"saved\",\"ddns_hostname\":\"" + String(cfg.ddns_hostname) + "\",\"ddns_domain\":\"" + String(cfg.ddns_domain) + "\"}");
+  });
+
+  addOptions("/api/ddns/ipurls");
+  server.on("/api/ddns/ipurls", HTTP_GET, []() {
+    sendCORS();
+    server.send(200, "application/json", "{\"public_ip_urls\":\"" + String(cfg.public_ip_urls) + "\"}");
+  });
+  server.on("/api/ddns/ipurls", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    String urls = server.arg("urls");
+    if (urls != "") strncpy(cfg.public_ip_urls, urls.c_str(), sizeof(cfg.public_ip_urls) - 1);
+    storageSave();
+    server.send(200, "application/json", "{\"status\":\"saved\",\"public_ip_urls\":\"" + String(cfg.public_ip_urls) + "\"}");
   });
 
   addOptions("/api/resolve");
@@ -422,7 +437,15 @@ void setupRoutes() {
     } else {
       WiFi.config(WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask());
     }
-    server.send(200, "application/json", "{\"status\":\"saved\",\"dns1\":\"" + String(cfg.static_dns1) + "\",\"dns2\":\"" + String(cfg.static_dns2) + "\",\"use_custom_dns\":" + String(cfg.use_custom_dns) + "}");
+    bool valid = validateNetworkConfig();
+    JsonDocument doc;
+    doc["status"] = "saved";
+    doc["dns1"] = cfg.static_dns1;
+    doc["dns2"] = cfg.static_dns2;
+    doc["use_custom_dns"] = cfg.use_custom_dns;
+    if (!valid) doc["warning"] = "config invalid, switched to DHCP";
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
   });
 
   addOptions("/api/ip/config");
@@ -439,7 +462,13 @@ void setupRoutes() {
       if (subnet != "") strncpy(cfg.static_subnet, subnet.c_str(), sizeof(cfg.static_subnet) - 1);
     }
     storageSave();
-    server.send(200, "application/json", "{\"status\":\"saved\",\"use_static_ip\":" + String(cfg.use_static_ip) + "}");
+    bool valid = validateNetworkConfig();
+    JsonDocument doc;
+    doc["status"] = "saved";
+    doc["use_static_ip"] = cfg.use_static_ip;
+    if (!valid) doc["warning"] = "config invalid, switched to DHCP";
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
   });
 
   addOptions("/api/pwm/pin");
@@ -514,6 +543,7 @@ void setupRoutes() {
     doc["use_custom_dns"] = cfg.use_custom_dns;
     doc["ddns_check_interval"] = cfg.ddns_check_interval;
     doc["ddns_upd_url"] = cfg.ddns_upd_url;
+    doc["public_ip_urls"] = cfg.public_ip_urls;
     String r; serializeJson(doc, r);
     server.send(200, "application/json", r);
   });
@@ -553,6 +583,7 @@ void setupRoutes() {
     setInt("use_custom_dns", cfg.use_custom_dns);
     setInt("ddns_check_interval", cfg.ddns_check_interval);
     setStr("ddns_upd_url", cfg.ddns_upd_url, sizeof(cfg.ddns_upd_url));
+    setStr("public_ip_urls", cfg.public_ip_urls, sizeof(cfg.public_ip_urls));
     storageSave();
     server.send(200, "application/json", "{\"status\":\"imported\"}");
   });

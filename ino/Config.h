@@ -31,6 +31,7 @@ struct Config {
   int use_custom_dns;
   int ddns_check_interval;
   char ddns_upd_url[256];
+  char public_ip_urls[512];
   char magic[4];
 };
 
@@ -42,5 +43,6 @@ void storageSave();
 void storageReset();
 bool storageInitialized();
 void applyNetworkConfig();
+bool validateNetworkConfig();
 
 #endif

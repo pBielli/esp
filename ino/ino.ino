@@ -44,6 +44,7 @@ void setup() {
   }
 
   applyNetworkConfig();
+  validateNetworkConfig();
 
   ntpBegin();
   logAdd(millis(), "Time: " + ntpGetTime());
@@ -81,14 +82,23 @@ void loop() {
           dns2.fromString(cfg.static_dns2);
           WiFi.config(ip, gw, subnet, dns1, dns2);
         } else if (cfg.use_custom_dns) {
-          IPAddress dns1, dns2;
-          bool ok_dns1 = dns1.fromString(cfg.static_dns1);
-          bool ok_dns2 = dns2.fromString(cfg.static_dns2);
-          if (ok_dns1 || ok_dns2) {
-            WiFi.config(WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask(), dns1, dns2);
-            logAdd(millis(), "Custom DNS re-applied: " + String(cfg.static_dns1) + ", " + String(cfg.static_dns2));
-          }
+          String ipStr = WiFi.localIP().toString();
+          String gwStr = WiFi.gatewayIP().toString();
+          String subnetStr = WiFi.subnetMask().toString();
+          strncpy(cfg.static_ip, ipStr.c_str(), sizeof(cfg.static_ip) - 1);
+          strncpy(cfg.static_gateway, gwStr.c_str(), sizeof(cfg.static_gateway) - 1);
+          strncpy(cfg.static_subnet, subnetStr.c_str(), sizeof(cfg.static_subnet) - 1);
+          storageSave();
+          IPAddress ip, gw, subnet, dns1, dns2;
+          ip.fromString(cfg.static_ip);
+          gw.fromString(cfg.static_gateway);
+          subnet.fromString(cfg.static_subnet);
+          dns1.fromString(cfg.static_dns1);
+          dns2.fromString(cfg.static_dns2);
+          WiFi.config(ip, gw, subnet, dns1, dns2);
+          logAdd(millis(), "Custom DNS applied: " + String(cfg.static_ip) + " / " + String(cfg.static_dns1) + ", " + String(cfg.static_dns2));
         }
+        validateNetworkConfig();
       }
     }
   }
@@ -102,11 +112,9 @@ void loop() {
     else {
       count_ddns_update_failures++;
       if(count_ddns_update_failures>=3){
-        Serial.println("DDNS check failed "+String(count_ddns_update_failures)+" times, blinking LED");
-        logAdd(millis(), "DDNS check failed "+String(count_ddns_update_failures)+" times, blinking LED");
-        while(true){
-          ledBlink(1000);
-        }
+        Serial.println("DDNS check failed "+String(count_ddns_update_failures)+" times");
+        logAdd(millis(), "DDNS check failed "+String(count_ddns_update_failures)+" times");
+        ledBlink(count_ddns_update_failures);
       } else {
         Serial.println("DDNS check failed "+String(count_ddns_update_failures)+" times, will try to update DDNS");
         logAdd(millis(), "DDNS check failed "+String(count_ddns_update_failures)+" times, will try to update DDNS");
