@@ -24,7 +24,6 @@ void setup() {
 
   storageBegin();
   storageLoad();
-    // storageReset();
   if (!storageInitialized()) {
     storageReset();
     logAdd(millis(), "Config reset to default");
@@ -34,7 +33,7 @@ void setup() {
   digitalWrite(cfg.led_pin, cfg.led_invert ? LOW : HIGH);
 
   WiFi.begin(cfg.wifi_ssid, cfg.wifi_password);
-  Serial.print("WiFi: Connecting to"+String(cfg.wifi_ssid));
+  Serial.print("WiFi: Connecting to "+String(cfg.wifi_ssid));
   int wifiTimeout = 40;
   while (WiFi.status() != WL_CONNECTED && wifiTimeout > 0) { delay(500); Serial.print("."); wifiTimeout--; }
   if (WiFi.status() == WL_CONNECTED) {
@@ -65,10 +64,11 @@ void loop() {
     static unsigned long lastWifiRetry = 0;
     if (millis() - lastWifiRetry > 30000) {
       lastWifiRetry = millis();
-      Serial.print("Reconnecting WiFi");
+      Serial.print("WiFi: Reconnecting to "+String(cfg.wifi_ssid));
       WiFi.begin(cfg.wifi_ssid, cfg.wifi_password);
       int wifiTimeout = 20;
       while (WiFi.status() != WL_CONNECTED && wifiTimeout > 0) { delay(500); Serial.print("."); wifiTimeout--; }
+        Serial.println("");
       if (WiFi.status() == WL_CONNECTED) {
         Serial.println(" OK " + WiFi.localIP().toString());
         logAdd(millis(), "WiFi reconnected: " + WiFi.localIP().toString());

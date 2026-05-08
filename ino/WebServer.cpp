@@ -521,32 +521,38 @@ void setupRoutes() {
   addOptions("/api/config/import");
   server.on("/api/config/import", HTTP_POST, []() {
     if (!checkAuth()) return;
-    String body = server.arg("plain");
+    String body = server.arg("config");
     if (body == "") { server.send(400, "application/json", "{\"error\":\"Missing JSON body\"}"); return; }
     JsonDocument doc;
     DeserializationError err = deserializeJson(doc, body);
     if (err) { server.send(400, "application/json", "{\"error\":\"Invalid JSON\"}"); return; }
-    if (doc["wifi_ssid"]) strncpy(cfg.wifi_ssid, doc["wifi_ssid"], sizeof(cfg.wifi_ssid) - 1);
-    if (doc["wifi_password"]) strncpy(cfg.wifi_password, doc["wifi_password"], sizeof(cfg.wifi_password) - 1);
-    if (doc["mdns_name"]) strncpy(cfg.mdns_name, doc["mdns_name"], sizeof(cfg.mdns_name) - 1);
-    if (doc["admin_password"]) strncpy(cfg.admin_password, doc["admin_password"], sizeof(cfg.admin_password) - 1);
-    if (doc["ddns_hostname"]) strncpy(cfg.ddns_hostname, doc["ddns_hostname"], sizeof(cfg.ddns_hostname) - 1);
-    if (doc["ddns_domain"]) strncpy(cfg.ddns_domain, doc["ddns_domain"], sizeof(cfg.ddns_domain) - 1);
-    if (doc["ddns_token"]) strncpy(cfg.ddns_token, doc["ddns_token"], sizeof(cfg.ddns_token) - 1);
-    if (doc["led_pin"]) cfg.led_pin = doc["led_pin"];
-    if (doc["tz_offset"]) cfg.tz_offset = doc["tz_offset"];
-    if (doc["ntp_server"]) strncpy(cfg.ntp_server, doc["ntp_server"], sizeof(cfg.ntp_server) - 1);
-    if (doc["led_invert"]) cfg.led_invert = doc["led_invert"];
-    if (doc["use_static_ip"]) cfg.use_static_ip = doc["use_static_ip"];
-    if (doc["static_ip"]) strncpy(cfg.static_ip, doc["static_ip"], sizeof(cfg.static_ip) - 1);
-    if (doc["static_gateway"]) strncpy(cfg.static_gateway, doc["static_gateway"], sizeof(cfg.static_gateway) - 1);
-    if (doc["static_subnet"]) strncpy(cfg.static_subnet, doc["static_subnet"], sizeof(cfg.static_subnet) - 1);
-    if (doc["static_dns1"]) strncpy(cfg.static_dns1, doc["static_dns1"], sizeof(cfg.static_dns1) - 1);
-    if (doc["static_dns2"]) strncpy(cfg.static_dns2, doc["static_dns2"], sizeof(cfg.static_dns2) - 1);
-    if (doc["pwm_pin"]) cfg.pwm_pin = doc["pwm_pin"];
-    if (doc["use_custom_dns"]) cfg.use_custom_dns = doc["use_custom_dns"];
-    if (doc["ddns_check_interval"]) cfg.ddns_check_interval = doc["ddns_check_interval"];
-    if (doc["ddns_upd_url"]) strncpy(cfg.ddns_upd_url, doc["ddns_upd_url"], sizeof(cfg.ddns_upd_url) - 1);
+    auto setStr = [&](const char* key, char* dest, size_t sz) {
+      if (doc[key].is<const char*>()) strncpy(dest, doc[key], sz - 1);
+    };
+    auto setInt = [&](const char* key, int& dest) {
+      if (doc[key].is<int>()) dest = doc[key].as<int>();
+    };
+    setStr("wifi_ssid", cfg.wifi_ssid, sizeof(cfg.wifi_ssid));
+    setStr("wifi_password", cfg.wifi_password, sizeof(cfg.wifi_password));
+    setStr("mdns_name", cfg.mdns_name, sizeof(cfg.mdns_name));
+    setStr("admin_password", cfg.admin_password, sizeof(cfg.admin_password));
+    setStr("ddns_hostname", cfg.ddns_hostname, sizeof(cfg.ddns_hostname));
+    setStr("ddns_domain", cfg.ddns_domain, sizeof(cfg.ddns_domain));
+    setStr("ddns_token", cfg.ddns_token, sizeof(cfg.ddns_token));
+    setInt("led_pin", cfg.led_pin);
+    setInt("tz_offset", cfg.tz_offset);
+    setStr("ntp_server", cfg.ntp_server, sizeof(cfg.ntp_server));
+    setInt("led_invert", cfg.led_invert);
+    setInt("use_static_ip", cfg.use_static_ip);
+    setStr("static_ip", cfg.static_ip, sizeof(cfg.static_ip));
+    setStr("static_gateway", cfg.static_gateway, sizeof(cfg.static_gateway));
+    setStr("static_subnet", cfg.static_subnet, sizeof(cfg.static_subnet));
+    setStr("static_dns1", cfg.static_dns1, sizeof(cfg.static_dns1));
+    setStr("static_dns2", cfg.static_dns2, sizeof(cfg.static_dns2));
+    setInt("pwm_pin", cfg.pwm_pin);
+    setInt("use_custom_dns", cfg.use_custom_dns);
+    setInt("ddns_check_interval", cfg.ddns_check_interval);
+    setStr("ddns_upd_url", cfg.ddns_upd_url, sizeof(cfg.ddns_upd_url));
     storageSave();
     server.send(200, "application/json", "{\"status\":\"imported\"}");
   });
@@ -554,7 +560,7 @@ void setupRoutes() {
   addOptions("/api/ddns/interval");
   server.on("/api/ddns/interval", HTTP_POST, []() {
     if (!checkAuth()) return;
-    int sec = server.arg("seconds").toInt();
+    int sec = server.arg("interval").toInt();
     if (sec < 10 || sec > 86400) { server.send(400, "application/json", "{\"error\":\"Interval must be 10-86400 seconds\"}"); return; }
     cfg.ddns_check_interval = sec;
     storageSave();

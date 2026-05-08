@@ -210,7 +210,7 @@ $('btn-refresh').addEventListener('click', refreshAll);
 // ── Info ───────────────────────────────────────────────────
 function updateInfoCard(info) {
   // SYSTEM card
-  setText('info-fw-version', info.fw_version || '—');
+  setText('info-fw-version', info.firmware || '—');
   setText('info-mdns',      info.mdns        || '—');
   setText('info-mac',       info.mac         || '—');
   setText('info-uptime',    info.uptime      ? formatUptime(info.uptime) : '—');
@@ -490,7 +490,7 @@ $('btn-gpio-pulse').addEventListener('click', async () => {
   const body = new URLSearchParams({ pin }).toString();
   try {
     const data = await apiFetch('/api/gpio/pulse', { method: 'POST', auth: true, body });
-    showResult('gpio-result', `GPIO ${data.pin} pulsed (${data.ms || 500}ms)`, 'success');
+    showResult('gpio-result', `GPIO ${data.pin} pulsed (${data.pulse_ms || 500}ms)`, 'success');
     toast(`GPIO ${pin} pulsed`, 'success');
   } catch (err) {
     showResult('gpio-result', `Error: ${err.message}`, 'error');
@@ -829,9 +829,9 @@ $('btn-ping').addEventListener('click', async () => {
   try {
     const data = await apiFetch(`/api/ping?host=${encodeURIComponent(host)}`, { auth: true });
     if (data.success) {
-      showResult('ping-result', `${data.host} is alive — ${data.avg_time_ms}ms avg (${data.transmitted} sent, ${data.received} received)`, 'success');
+      showResult('ping-result', `${data.host} is alive — ${data.rtt_ms}ms avg`, 'success');
     } else {
-      showResult('ping-result', `${data.host} is unreachable (${data.received}/${data.transmitted} packets)`, 'error');
+      showResult('ping-result', `${data.host} is unreachable`, 'error');
     }
   } catch (err) {
     showResult('ping-result', `Error: ${err.message}`, 'error');
@@ -919,9 +919,9 @@ $('btn-config-import').addEventListener('change', async (e) => {
 // ── System Tab ────────────────────────────────────────────
 async function loadSystemTab() {
   try {
-    const info = await apiFetch('/api/info');
-    setText('sys-version', info.fw_version || '—');
-    setText('sys-build',   info.build_date || '—');
+    const data = await apiFetch('/api/system/version', { auth: true });
+    setText('sys-version', data.version || '—');
+    setText('sys-build',   data.build_date || '—');
   } catch {}
 }
 
