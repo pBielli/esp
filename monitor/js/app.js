@@ -362,6 +362,7 @@ async function loadDdnsConfig() {
     const info = await apiFetch('/api/info');
     if (info.ddns) $('ddns-hostname').value = info.ddns;
     if (info.ddns) $('ddns-hostname').placeholder = info.ddns;
+    if (info.ddns_domain) $('ddns-domain').value = info.ddns_domain;
     if (info.ddns_upd_url) $('ddns-upd-url').value = info.ddns_upd_url;
   } catch {}
 }

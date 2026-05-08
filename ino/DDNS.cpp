@@ -30,7 +30,7 @@ String updateDDNS(String ip) {
   WiFiClient c;
   String url = String(cfg.ddns_upd_url);
   url.replace("$domain", String(cfg.ddns_domain));
-  url.replace("$token", String(cfg.duckdns_token));
+  url.replace("$token", String(cfg.ddns_token));
   url.replace("$ip", ip);
   http.begin(c, url);
   int code = http.GET();

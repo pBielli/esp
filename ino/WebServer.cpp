@@ -135,6 +135,7 @@ void setupRoutes() {
     doc["rssi"] = WiFi.RSSI();
     doc["mdns"] = cfg.mdns_name;
     doc["ddns"] = cfg.ddns_hostname;
+    doc["ddns_domain"] = cfg.ddns_domain;
     doc["uptime"] = millis() / 1000;
     doc["free_heap"] = ESP.getFreeHeap();
     doc["local_ip"] = WiFi.localIP().toString();
@@ -220,11 +221,11 @@ void setupRoutes() {
     String token = server.arg("token");
     String upd_url = server.arg("upd_url");
     if (hostname != "") strncpy(cfg.ddns_hostname, hostname.c_str(), 63);
-    if (domain != "") strncpy(cfg.duckdns_domain, domain.c_str(), 31);
-    if (token != "") strncpy(cfg.duckdns_token, token.c_str(), 47);
+    if (domain != "") strncpy(cfg.ddns_domain, domain.c_str(), 31);
+    if (token != "") strncpy(cfg.ddns_token, token.c_str(), 47);
     if (upd_url != "") strncpy(cfg.ddns_upd_url, upd_url.c_str(), 255);
     storageSave();
-    server.send(200, "application/json", "{\"status\":\"saved\",\"ddns_hostname\":\"" + String(cfg.ddns_hostname) + "\",\"ddns_domain\":\"" + String(cfg.duckdns_domain) + "\"}");
+    server.send(200, "application/json", "{\"status\":\"saved\",\"ddns_hostname\":\"" + String(cfg.ddns_hostname) + "\",\"ddns_domain\":\"" + String(cfg.ddns_domain) + "\"}");
   });
 
   addOptions("/api/resolve");

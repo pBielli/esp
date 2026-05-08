@@ -1086,6 +1086,13 @@ body {
   .scan-table { font-size: 0.65rem; }
 }
 
+/* ── Form Divider ── */
+.form-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0.2rem 0;
+}
+
 /* Utilities */
 .hidden { display: none !important; }
 
