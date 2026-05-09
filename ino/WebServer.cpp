@@ -109,10 +109,10 @@ void setupRoutes() {
     add("/api/gpio/analog/write", "POST", true,  {"pin","value"});
     add("/api/gpio/set",          "POST", true,  {"pin","mode","value"});
     add("/api/led/pin",           "POST", true,  {"pin"});
-    add("/api/led/invert",        "POST", true,  {"enabled"});
+    add("/api/gpio/invert",       "POST", true,  {"enabled"});
     add("/api/led/on",            "POST", true,  {});
     add("/api/led/off",           "POST", true,  {});
-    add("/api/led/blink",         "POST", true,  {});
+    add("/api/ddns/check",        "GET",  false, {});
     add("/api/ntp/set",           "POST", true,  {"server","tz_offset"});
     add("/api/wifi/scan",         "GET",  true,  {});
     add("/api/set/mdns",          "POST", true,  {"mdns"});
@@ -132,7 +132,7 @@ void setupRoutes() {
     add("/api/ddns/refresh-ip",   "GET",  false, {"idx"});
     add("/api/gpio/pulse",        "POST", true,  {"pin","ms"});
     add("/api/gpio/toggle",       "POST", true,  {"pin"});
-    add("/api/gpio/blink",        "POST", true,  {"pin","times"});
+    add("/api/gpio/blink",        "POST", true,  {"pin","times","ms"});
     String r; serializeJson(doc, r);
     server.send(200, "application/json", r);
   });
@@ -156,8 +156,9 @@ void setupRoutes() {
     doc["dns2"] = WiFi.dnsIP(1).toString();
     doc["ntp_server"] = cfg.ntp_server;
     doc["tz_offset"] = cfg.tz_offset;
-    doc["led_invert"] = cfg.led_invert;
+    doc["gpio_invert"] = cfg.gpio_invert;
     doc["led_pin"] = cfg.led_pin;
+    doc["build_date"] = __DATE__;
     doc["use_static_ip"] = cfg.use_static_ip;
     doc["static_ip"] = cfg.static_ip;
     doc["static_gateway"] = cfg.static_gateway;
@@ -170,6 +171,10 @@ void setupRoutes() {
     doc["ddns_upd_url"] = cfg.ddns_upd_url;
     doc["public_ip_urls"] = cfg.public_ip_urls;
     doc["firmware"] = FIRMWARE_VERSION;
+    doc["last_check_time"] = (long)(lastCheckTime > 0 ? millis() - lastCheckTime : -1);
+    doc["last_check_match"] = lastCheckMatch;
+    doc["last_check_public_ip"] = lastCheckedPublicIP;
+    doc["last_check_ddns_ip"] = lastCheckedDomainIP;
     String ddnsIp = getCachedDDNSIP();
     if (ddnsIp != "") doc["ddns_ip"] = ddnsIp;
     String pubIp = getCachedPublicIP();
@@ -296,6 +301,13 @@ void setupRoutes() {
     server.send(200, "application/json", r);
   });
 
+  addOptions("/api/ddns/check");
+  server.on("/api/ddns/check", []() {
+    sendCORS();
+    String r = ddnsCheck();
+    server.send(200, "application/json", r);
+  });
+
   addOptions("/api/resolve");
   server.on("/api/resolve", []() {
     sendCORS();
@@ -405,18 +417,18 @@ void setupRoutes() {
     if (pin < 0 || pin > 16) { server.send(400, "application/json", "{\"error\":\"Invalid pin\"}"); return; }
     cfg.led_pin = pin;
     pinMode(cfg.led_pin, OUTPUT);
-    digitalWrite(cfg.led_pin, cfg.led_invert ? LOW : HIGH);
+    digitalWrite(cfg.led_pin, cfg.gpio_invert ? LOW : HIGH);
     storageSave();
     server.send(200, "application/json", "{\"status\":\"saved\",\"led_pin\":" + String(cfg.led_pin) + "}");
   });
 
-  addOptions("/api/led/invert");
-  server.on("/api/led/invert", HTTP_POST, []() {
+  addOptions("/api/gpio/invert");
+  server.on("/api/gpio/invert", HTTP_POST, []() {
     if (!checkAuth()) return;
     String enabled = server.arg("enabled");
-    cfg.led_invert = (enabled == "1" || enabled == "true") ? 1 : 0;
+    cfg.gpio_invert = (enabled == "1" || enabled == "true") ? 1 : 0;
     storageSave();
-    server.send(200, "application/json", "{\"status\":\"saved\",\"led_invert\":" + String(cfg.led_invert) + "}");
+    server.send(200, "application/json", "{\"status\":\"saved\",\"gpio_invert\":" + String(cfg.gpio_invert) + "}");
   });
 
   addOptions("/api/led/on");
@@ -439,14 +451,6 @@ void setupRoutes() {
     doc["state"] = "off";
     String r; serializeJson(doc, r);
     server.send(200, "application/json", r);
-  });
-
-  addOptions("/api/led/blink");
-  server.on("/api/led/blink", []() {
-    if (!checkAuth()) return;
-    int n = server.arg("times").toInt(); if (n < 1 || n > 100) n = 5;
-    ledBlink(n);
-    server.send(200, "application/json", "{\"blinked\":" + String(n) + "}");
   });
 
   addOptions("/api/set/ssid");
@@ -625,7 +629,7 @@ void setupRoutes() {
     doc["led_pin"] = cfg.led_pin;
     doc["tz_offset"] = cfg.tz_offset;
     doc["ntp_server"] = cfg.ntp_server;
-    doc["led_invert"] = cfg.led_invert;
+    doc["gpio_invert"] = cfg.gpio_invert;
     doc["use_static_ip"] = cfg.use_static_ip;
     doc["static_ip"] = cfg.static_ip;
     doc["static_gateway"] = cfg.static_gateway;
@@ -665,7 +669,7 @@ void setupRoutes() {
     setInt("led_pin", cfg.led_pin);
     setInt("tz_offset", cfg.tz_offset);
     setStr("ntp_server", cfg.ntp_server, sizeof(cfg.ntp_server));
-    setInt("led_invert", cfg.led_invert);
+    setInt("gpio_invert", cfg.gpio_invert);
     setInt("use_static_ip", cfg.use_static_ip);
     setStr("static_ip", cfg.static_ip, sizeof(cfg.static_ip));
     setStr("static_gateway", cfg.static_gateway, sizeof(cfg.static_gateway));
@@ -712,7 +716,9 @@ void setupRoutes() {
     if (!checkAuth()) return;
     int pin = server.arg("pin").toInt();
     int times = server.arg("times").toInt();
-    server.send(200, "application/json", gpioBlink(pin, times));
+    int ms = server.arg("ms").toInt();
+    if (ms < 10 || ms > 5000) ms = 200;
+    server.send(200, "application/json", gpioBlink(pin, times, ms));
   });
 
   server.begin();

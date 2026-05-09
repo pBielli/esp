@@ -15,6 +15,10 @@ String getDDNSIP() {
 
 String _cachedPublicIP = "";
 String _cachedDDNSIP = "";
+unsigned long lastCheckTime = 0;
+bool lastCheckMatch = false;
+String lastCheckedPublicIP = "";
+String lastCheckedDomainIP = "";
 
 String getCachedPublicIP() { return _cachedPublicIP; }
 String getCachedDDNSIP() { return _cachedDDNSIP; }
@@ -138,19 +142,46 @@ bool checkDDNS() {
   String ddns = getDDNSIP();
   _cachedPublicIP = pub;
   _cachedDDNSIP = ddns;
+  lastCheckTime = millis();
+  lastCheckedPublicIP = pub;
+  lastCheckedDomainIP = ddns;
   bool flag=false;
   if (ddns != "" && pub != "") {
     if (ddns != pub) {
-      logPrint("DDNS", "Mismatch detected: DDNS=" + ddns + " Public=" + pub + " - Updating...");
-      ledBlink(5);
+      logPrint("DDNS", "Mismatch detected: DDNS=" + ddns + " Public=" + pub);
+      lastCheckMatch = false;
       ledOn();
     } else {
       logPrint("DDNS", "Match OK: " + ddns);
+      lastCheckMatch = true;
       ledOff();
       flag=true;
     }
   }
   return flag;
+}
+
+String ddnsCheck() {
+  String pub = getPublicIP();
+  String ddns = getDDNSIP();
+  _cachedPublicIP = pub;
+  _cachedDDNSIP = ddns;
+  lastCheckTime = millis();
+  lastCheckedPublicIP = pub;
+  lastCheckedDomainIP = ddns;
+  bool match = (ddns != "" && pub != "" && ddns == pub);
+  lastCheckMatch = match;
+  String urls = String(cfg.public_ip_urls);
+  int comma = urls.indexOf(',');
+  String firstServer = (comma == -1) ? urls : urls.substring(0, comma);
+  firstServer.trim();
+  JsonDocument doc;
+  doc["public_ip"] = pub;
+  doc["ddns_ip"] = ddns;
+  doc["match"] = match;
+  doc["server"] = firstServer;
+  String r; serializeJson(doc, r);
+  return r;
 }
 bool checkAndUpdateDDNS() {
   bool flag = checkDDNS();

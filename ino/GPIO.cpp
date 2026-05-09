@@ -8,8 +8,9 @@ String gpioSet(int pin, String mode, String value) {
     return "{\"pin\":" + String(pin) + ",\"mode\":\"input\"}";
   } else if (mode == "output") {
     pinMode(pin, OUTPUT);
-    if (value == "1" || value == "HIGH") digitalWrite(pin, HIGH);
-    else if (value == "0" || value == "LOW") digitalWrite(pin, LOW);
+    bool invert = cfg.gpio_invert == 1;
+    if (value == "1" || value == "HIGH") digitalWrite(pin, invert ? LOW : HIGH);
+    else if (value == "0" || value == "LOW") digitalWrite(pin, invert ? HIGH : LOW);
     return "{\"pin\":" + String(pin) + ",\"mode\":\"output\",\"value\":" + String(digitalRead(pin)) + "}";
   }
   return "{\"error\":\"Invalid mode\"}";
@@ -36,27 +37,29 @@ String gpioInfo() {
   return out;
 }
 
-String gpioBlink(int pin, int times) {
+String gpioBlink(int pin, int times, int ms) {
   if (pin < 0 || pin > 16) return "{\"error\":\"Invalid pin\"}";
   if (times < 1 || times > 100) times = 5;
+  if (ms < 10 || ms > 5000) ms = 200;
   pinMode(pin, OUTPUT);
+  bool invert = cfg.gpio_invert == 1;
   for (int i = 0; i < times; i++) {
-    digitalWrite(pin, HIGH);
-    delay(200);
-    digitalWrite(pin, LOW);
-    delay(200);
+    digitalWrite(pin, invert ? LOW : HIGH);
+    delay(ms);
+    digitalWrite(pin, invert ? HIGH : LOW);
+    delay(ms);
   }
-  char buf[64];
-  snprintf(buf, sizeof(buf), "{\"pin\":%d,\"blinked\":%d}", pin, times);
+  char buf[96];
+  snprintf(buf, sizeof(buf), "{\"pin\":%d,\"blinked\":%d,\"ms\":%d}", pin, times, ms);
   return String(buf);
 }
 
 void ledOn() {
-  digitalWrite(cfg.led_pin, cfg.led_invert ? HIGH : LOW);
+  digitalWrite(cfg.led_pin, cfg.gpio_invert ? HIGH : LOW);
 }
 
 void ledOff() {
-  digitalWrite(cfg.led_pin, cfg.led_invert ? LOW : HIGH);
+  digitalWrite(cfg.led_pin, cfg.gpio_invert ? LOW : HIGH);
 }
 
 String analogReadPin() {
@@ -92,9 +95,10 @@ void ledBlink(int times) {
 String gpioPulse(int pin, int ms) {
   if (pin < 0 || pin > 16) return "{\"error\":\"Invalid pin\"}";
   pinMode(pin, OUTPUT);
-  digitalWrite(pin, HIGH);
+  bool invert = cfg.gpio_invert == 1;
+  digitalWrite(pin, invert ? LOW : HIGH);
   delay(ms);
-  digitalWrite(pin, LOW);
+  digitalWrite(pin, invert ? HIGH : LOW);
   return "{\"pin\":" + String(pin) + ",\"pulse_ms\":" + String(ms) + "}";
 }
 

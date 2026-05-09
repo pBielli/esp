@@ -819,30 +819,7 @@ body {
   scrollbar-color: var(--border) transparent;
 }
 
-/* API List */
-.api-list {
-  margin-top: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.api-endpoint {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.5rem 0.7rem;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  font-size: 0.75rem;
-  cursor: pointer;
-  transition: all var(--transition);
-  text-decoration: none;
-  color: var(--text);
-}
-
-.api-endpoint:hover { border-color: var(--green); color: var(--green); }
-
+/* API method badge */
 .api-method {
   font-size: 0.6rem;
   font-weight: 700;
@@ -1108,6 +1085,48 @@ body {
   font-size: 0.6rem;
   color: var(--text-dim);
   letter-spacing: 0.1em;
+}
+
+/* ── WiFi Scan current/selected row ── */
+.scan-table tr.scan-row-current td {
+  background: rgba(0,255,136,0.06);
+  color: var(--green);
+}
+.scan-table tr.selected td {
+  background: var(--green-dark) !important;
+  color: var(--text-bright);
+}
+.scan-table tbody tr {
+  cursor: pointer;
+}
+
+/* ── API List ── */
+.api-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+.api-list-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  cursor: pointer;
+  transition: background var(--transition);
+  border-bottom: 1px solid rgba(0,255,136,0.04);
+}
+.api-list-item:hover { background: var(--bg4); }
+.api-list-item.active {
+  background: var(--green-dark);
+  color: var(--text-bright);
+}
+.api-list-item .api-tester-method {
+  min-width: 36px;
+  text-align: center;
 }
 
 /* ── DDNS LED merged card ── */

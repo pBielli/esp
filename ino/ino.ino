@@ -17,7 +17,6 @@
 
 unsigned long lastCheck = 0;
 bool flag_firtstRun = true;
-int count_ddns_update_failures=0;
 void setup() {
   Serial.begin(115200);
   Serial.println("\n");
@@ -30,7 +29,7 @@ void setup() {
   }
 
   pinMode(cfg.led_pin, OUTPUT);
-  digitalWrite(cfg.led_pin, cfg.led_invert ? LOW : HIGH);
+  digitalWrite(cfg.led_pin, cfg.gpio_invert ? LOW : HIGH);
 
   WiFi.begin(cfg.wifi_ssid, cfg.wifi_password);
   logPrint("WIFI", "Connecting to " + String(cfg.wifi_ssid));
@@ -104,18 +103,7 @@ void loop() {
   if (millis() - lastCheck > (unsigned long)cfg.ddns_check_interval * 1000 || flag_firtstRun) {
     if(flag_firtstRun)
       flag_firtstRun = false;
-    //controlla n volte, se non va allora aggiorna, se va allora è tutto ok, se non va dopo aggiornamento allora c'è un problema e blinka in continuo, altrimenti se risolve prima allora è tutto ok resetta contatore e ricomincia
-    if(checkDDNS())
-      count_ddns_update_failures=0;
-    else {
-      count_ddns_update_failures++;
-      if(count_ddns_update_failures>=3){
-        logPrint("DDNS", "Check failed " + String(count_ddns_update_failures) + " times");
-        ledBlink(count_ddns_update_failures);
-      } else {
-        logPrint("DDNS", "Check failed " + String(count_ddns_update_failures) + " times, will update");
-        checkAndUpdateDDNS();
-      }}
+    checkDDNS();
     lastCheck = millis();
-      }
+  }
 }

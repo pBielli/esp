@@ -20,7 +20,7 @@ struct Config {
   int led_pin;
   int tz_offset;
   char ntp_server[64];
-  int led_invert;
+  int gpio_invert;
   int use_static_ip;
   char static_ip[16];
   char static_gateway[16];

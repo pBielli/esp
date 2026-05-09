@@ -177,7 +177,7 @@
             <div class="info-grid">
               <div class="info-item"><span class="info-label">NTP SERVER</span><span class="info-val" id="info-ntp-server">—</span></div>
               <div class="info-item"><span class="info-label">TIMEZONE</span><span class="info-val" id="info-tz">—</span></div>
-              <div class="info-item"><span class="info-label">LED INVERT</span><span class="info-val" id="info-led-invert">—</span></div>
+              <div class="info-item"><span class="info-label">GPIO INVERT</span><span class="info-val" id="info-gpio-invert">—</span></div>
               <div class="info-item"><span class="info-label">LED PIN</span><span class="info-val" id="info-led-pin">—</span></div>
               <div class="info-item"><span class="info-label">PWM PIN</span><span class="info-val" id="info-pwm-pin">—</span></div>
             </div>
@@ -198,6 +198,7 @@
             <div class="card-header">
               <span class="card-icon">⬡</span>
               <span class="card-title">DDNS STATUS</span>
+              <button class="card-action-btn" id="btn-ddns-check">CHECK</button>
             </div>
             <div class="ddns-status-display">
               <div class="ddns-indicator" id="ddns-indicator">
@@ -208,7 +209,14 @@
                 <div class="ddns-row"><span class="ddns-lbl">DOMAIN IP</span><span class="ddns-val" id="ddns-domain-ip">—</span></div>
                 <div class="ddns-row"><span class="ddns-lbl">PUBLIC IP</span><span class="ddns-val" id="ddns-public-ip">—</span></div>
                 <div class="ddns-row"><span class="ddns-lbl">STATE</span><span class="ddns-val" id="ddns-state">UNKNOWN</span></div>
+                <div class="ddns-row"><span class="ddns-lbl">LAST CHECK</span><span class="ddns-val" id="ddns-last-check">—</span></div>
               </div>
+            </div>
+            <div class="action-block hidden" id="ddns-check-result-block" style="border-top:1px solid var(--border);padding:0.5rem;margin-top:0.5rem">
+              <div class="action-result" id="ddns-check-result"></div>
+              <button class="btn-action btn-primary hidden" id="btn-ddns-force-update" style="margin-top:0.4rem;font-size:0.65rem">
+                <span>⟳</span> FORCE UPDATE
+              </button>
             </div>
           </div>
 
@@ -221,6 +229,17 @@
             <div class="info-grid">
               <div class="info-item"><span class="info-label">GATEWAY</span><span class="info-val" id="conn-gateway">—</span></div>
               <div class="info-item"><span class="info-label">INTERNET (8.8.8.8)</span><span class="info-val" id="conn-internet">—</span></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-icon">⟳</span>
+              <span class="card-title">REBOOT</span>
+            </div>
+            <div class="action-block" style="text-align:center;padding-top:0.5rem">
+              <button class="btn-action btn-primary" id="btn-ov-reboot">⟳ REBOOT</button>
+              <div class="action-result hidden" id="ov-reboot-result"></div>
             </div>
           </div>
         </div>
@@ -338,14 +357,7 @@
               <button class="btn-action btn-led-on" id="btn-led-on">ON</button>
               <button class="btn-action btn-led-off" id="btn-led-off">OFF</button>
             </div>
-            <div class="led-invert-block" style="border:none;padding:0;margin-top:0.5rem">
-              <label class="toggle-label">
-                <span class="toggle-text">INVERT OUTPUT</span>
-                <span class="toggle-switch" id="led-invert-toggle">
-                  <span class="toggle-slider"></span>
-                </span>
-              </label>
-            </div>
+
           </div>
           <div class="ddns-led-controls">
             <label class="field-label">LED PIN</label>
@@ -447,12 +459,24 @@
             <button class="btn-action btn-primary" id="btn-gpio-pwm-write">WRITE PWM</button>
           </div>
           <div class="form-row">
+            <div class="form-field">
+              <label class="toggle-label" style="gap:0.3rem">
+                <span class="toggle-text" style="font-size:0.55rem">INVERT OUTPUT</span>
+                <span class="toggle-switch" id="gpio-invert-toggle">
+                  <span class="toggle-slider"></span>
+                </span>
+              </label>
+            </div>
+          </div>
+          <div class="form-row">
             <label class="field-label" style="font-size:0.6rem;margin-right:0.3rem">BLINK</label>
             <div class="blink-counter" style="margin-right:0.5rem">
               <button class="counter-btn" id="blink-dec" type="button">−</button>
               <span class="counter-val" id="blink-count">5</span>
               <button class="counter-btn" id="blink-inc" type="button">+</button>
             </div>
+            <input type="number" class="field-input inline-input" id="blink-ms" placeholder="200" min="10" max="5000" style="width:55px;padding:0.3rem;font-size:0.6rem" />
+            <span style="font-size:0.55rem;color:var(--text-dim)">ms</span>
             <button class="btn-action btn-primary" id="btn-blink">BLINK</button>
           </div>
           <div class="action-result hidden" id="gpio-result"></div>
@@ -813,8 +837,27 @@
           <button class="card-action-btn" id="btn-api-refresh">REFRESH</button>
         </div>
         <div id="api-explorer-container">
-          <p class="action-desc" style="margin-bottom:0.5rem">Click REFRESH to load all available API endpoints from the device. Each endpoint can be tested directly.</p>
-          <div id="api-endpoints-list"></div>
+          <p class="action-desc" style="margin-bottom:0.5rem">Select an endpoint from the list below, then configure and call it.</p>
+          <div id="api-endpoints-list" class="api-list"></div>
+          <div id="api-tester-detail" class="hidden">
+            <hr class="form-divider" style="margin:0.8rem 0">
+            <div class="api-tester-header">
+              <span class="api-tester-method" id="api-detail-method">GET</span>
+              <span class="api-tester-path" id="api-detail-path">—</span>
+            </div>
+            <div id="api-detail-params" class="api-tester-inputs"></div>
+            <div class="form-row">
+              <button class="btn-action btn-primary" id="btn-api-call" style="font-size:0.65rem;padding:0.35rem 0.7rem">CALL</button>
+              <label class="api-tester-auth-toggle">
+                <input type="checkbox" id="api-detail-auth" checked />
+                <span>AUTH</span>
+              </label>
+            </div>
+            <div class="api-response hidden" id="api-detail-response">
+              <button class="api-copy-btn" id="btn-api-copy">COPY</button>
+              <pre class="api-response-body" id="api-detail-body" style="margin:0;font-family:inherit;white-space:pre-wrap"></pre>
+            </div>
+          </div>
         </div>
       </div>
     </div>

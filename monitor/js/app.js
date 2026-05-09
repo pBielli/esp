@@ -251,7 +251,8 @@ function updateInfoCard(info) {
   } else {
     setText('info-tz', '—');
   }
-  setText('info-led-invert', info.led_invert ? 'YES' : 'NO');
+  setText('info-fw-build',  info.build_date  || '—');
+  setText('info-gpio-invert', info.gpio_invert ? 'YES' : 'NO');
   setText('info-led-pin',   info.led_pin != null ? `GPIO ${info.led_pin}` : '—');
   setText('info-pwm-pin',   info.pwm_pin != null ? `GPIO ${info.pwm_pin}` : '—');
 
@@ -265,6 +266,14 @@ function updateInfoCard(info) {
     setText('ddns-public-ip', '—');
     setText('ddns-state', 'UNKNOWN');
   }
+  // Last DDNS check info
+  if (info.last_check_time != null && info.last_check_time >= 0) {
+    const secs = Math.floor(info.last_check_time / 1000);
+    setText('ddns-last-check', formatUptime(secs) + ' ago');
+  } else {
+    setText('ddns-last-check', '—');
+  }
+  updateLedInvertUI(info.gpio_invert === 1);
 }
 
 function updateDdnsStatus(domainIp, publicIp) {
@@ -292,20 +301,59 @@ function formatUptime(seconds) {
   return `${h}h ${m}m ${sec}s`;
 }
 
-// ── DDNS Indicator click → force update ──────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  const indicator = $('ddns-indicator');
-  if (indicator) {
-    indicator.style.cursor = 'pointer';
-    indicator.addEventListener('click', async () => {
-      try {
-        const data = await apiFetch('/api/ddns/update', { auth: true });
-        toast('DDNS update: ' + data.status, 'success');
-        setTimeout(refreshAll, 2000);
-      } catch (err) {
-        toast('DDNS update failed: ' + err.message, 'error');
-      }
-    });
+// ── DDNS Check (new behavior) ─────────────────────────────
+$('btn-ddns-check').addEventListener('click', async () => {
+  const block = $('ddns-check-result-block');
+  const result = $('ddns-check-result');
+  const forceBtn = $('btn-ddns-force-update');
+  block.classList.remove('hidden');
+  forceBtn.classList.add('hidden');
+  result.className = 'action-result';
+  result.textContent = '⟳ Checking...';
+  setText('ddns-domain-ip', '⟳');
+  setText('ddns-public-ip', '⟳');
+  try {
+    const data = await apiFetch('/api/ddns/check');
+    setText('ddns-domain-ip', data.ddns_ip || '—');
+    setText('ddns-public-ip', data.public_ip || '—');
+    const ind = $('ddns-indicator');
+    const icon = ind.querySelector('.ddns-icon');
+    if (data.match) {
+      ind.className = 'ddns-indicator ok';
+      icon.textContent = '✓';
+      setText('ddns-state', 'IN SYNC');
+      result.className = 'action-result success';
+      result.textContent = `IPs match: ${data.public_ip}`;
+    } else {
+      ind.className = 'ddns-indicator mismatch';
+      icon.textContent = '!';
+      setText('ddns-state', 'MISMATCH');
+      result.className = 'action-result error';
+      result.textContent = `DDNS: ${data.ddns_ip || '—'} ≠ Public: ${data.public_ip || '—'}`;
+      forceBtn.classList.remove('hidden');
+    }
+    toast('DDNS check done', 'success');
+    setTimeout(refreshAll, 2000);
+  } catch (err) {
+    result.className = 'action-result error';
+    result.textContent = `Check failed: ${err.message}`;
+    toast('DDNS check failed', 'error');
+  }
+});
+
+$('btn-ddns-force-update').addEventListener('click', async () => {
+  const result = $('ddns-check-result');
+  result.textContent = '⟳ Updating...';
+  try {
+    const data = await apiFetch('/api/ddns/update', { auth: true });
+    result.className = 'action-result success';
+    result.textContent = `Update sent: ${data.status}`;
+    toast('DDNS update sent', 'success');
+    setTimeout(refreshAll, 2000);
+  } catch (err) {
+    result.className = 'action-result error';
+    result.textContent = `Update failed: ${err.message}`;
+    toast('DDNS update failed', 'error');
   }
 });
 
@@ -384,9 +432,9 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     $(`tab-${btn.dataset.tab}`).classList.add('active');
 
     // Lazy-load tab data
-    if (btn.dataset.tab === 'gpio') loadGpioInfo();
+    if (btn.dataset.tab === 'gpio') { loadGpioInfo(); loadGpioInvert(); }
     if (btn.dataset.tab === 'log') loadLog();
-    if (btn.dataset.tab === 'ddns') { loadDdnsConfig(); loadLedInvert(); }
+    if (btn.dataset.tab === 'ddns') { loadDdnsConfig(); }
     if (btn.dataset.tab === 'network') loadNetworkTab();
     if (btn.dataset.tab === 'api') loadApiExplorer();
   });
@@ -680,10 +728,11 @@ $('blink-inc').addEventListener('click', () => {
 $('btn-blink').addEventListener('click', async () => {
   const pin = $('gpio-pin-sel').value;
   const times = state.blinkCount;
-  const body = new URLSearchParams({ pin, times }).toString();
+  const ms = parseInt($('blink-ms').value) || 200;
+  const body = new URLSearchParams({ pin, times, ms }).toString();
   try {
     const data = await apiFetch('/api/gpio/blink', { method: 'POST', auth: true, body });
-    showResult('gpio-result', `GPIO ${data.pin} blinked ${data.blinked} times`, 'success');
+    showResult('gpio-result', `GPIO ${data.pin} blinked ${data.blinked}×${data.ms ? ' ('+data.ms+'ms)' : ''}`, 'success');
     toast(`GPIO ${pin} blinked ×${data.blinked}`, 'success');
   } catch (err) {
     showResult('gpio-result', `Error: ${err.message}`, 'error');
@@ -705,26 +754,26 @@ $('btn-led-pin').addEventListener('click', async () => {
   }
 });
 
-// ── LED Invert ──────────────────────────────────────────────
-async function loadLedInvert() {
+// ── GPIO Invert ─────────────────────────────────────────────
+async function loadGpioInvert() {
   try {
     const info = await apiFetch('/api/info');
-    updateLedInvertUI(info.led_invert === 1);
+    updateLedInvertUI(info.gpio_invert === 1);
   } catch {}
 }
 
 function updateLedInvertUI(enabled) {
-  const toggle = $('led-invert-toggle');
-  toggle.classList.toggle('active', enabled);
+  const toggle = $('gpio-invert-toggle');
+  if (toggle) toggle.classList.toggle('active', enabled);
 }
 
-$('led-invert-toggle').addEventListener('click', async () => {
-  const enabled = $('led-invert-toggle').classList.contains('active') ? 0 : 1;
+$('gpio-invert-toggle')?.addEventListener('click', async () => {
+  const enabled = $('gpio-invert-toggle').classList.contains('active') ? 0 : 1;
   const body = new URLSearchParams({ enabled }).toString();
   try {
-    await apiFetch('/api/led/invert', { method: 'POST', auth: true, body });
+    await apiFetch('/api/gpio/invert', { method: 'POST', auth: true, body });
     updateLedInvertUI(enabled === 1);
-    toast(`LED invert ${enabled ? 'ON' : 'OFF'}`, 'success');
+    toast(`GPIO invert ${enabled ? 'ON' : 'OFF'}`, 'success');
   } catch (err) {
     toast(`Invert failed: ${err.message}`, 'error');
   }
@@ -828,6 +877,7 @@ function renderScanResults(networks) {
     return;
   }
   const encLabels = ['Open', 'WEP', 'WPA/PSK', 'WPA2/PSK', 'WPA/WPA2'];
+  const currentSsid = ($('wifi-ssid').value || $('wifi-ssid').placeholder || '').trim();
   statusEl.textContent = `${networks.length} network(s) found.`;
   statusEl.className = 'scan-status success';
   resultsEl.innerHTML = '';
@@ -835,12 +885,25 @@ function renderScanResults(networks) {
 
   const table = document.createElement('table');
   table.className = 'scan-table';
-  table.innerHTML = `<thead><tr><th>SSID</th><th>RSSI</th><th>CH</th><th>ENC</th></tr></thead>`;
+  table.innerHTML = `<thead><tr><th>SSID</th><th>RSSI</th><th>SIGNAL</th><th>CH</th><th>ENC</th></tr></thead>`;
   const tbody = document.createElement('tbody');
   for (const net of networks) {
     const row = document.createElement('tr');
     const enc = encLabels[net.encryption] || `Type ${net.encryption}`;
-    row.innerHTML = `<td>${escapeHtml(net.ssid)}</td><td>${net.rssi} dBm</td><td>${net.channel}</td><td>${enc}</td>`;
+    const rssiPct = Math.max(0, Math.min(100, Math.round(((net.rssi + 100) / 60) * 100)));
+    const isCurrent = net.ssid && currentSsid && net.ssid === currentSsid;
+    if (isCurrent) row.className = 'scan-row-current';
+    row.dataset.ssid = net.ssid || '';
+    row.innerHTML = `<td>${escapeHtml(net.ssid)}</td><td>${net.rssi} dBm</td><td>${rssiPct}%</td><td>${net.channel}</td><td>${enc}</td>`;
+    row.addEventListener('click', () => {
+      document.querySelectorAll('.scan-table tbody tr.selected').forEach(r => r.classList.remove('selected'));
+      row.classList.add('selected');
+      const ssid = row.dataset.ssid;
+      if (ssid) {
+        $('wifi-ssid').value = ssid;
+        $('wifi-pswd').focus();
+      }
+    });
     tbody.appendChild(row);
   }
   table.appendChild(tbody);
@@ -987,113 +1050,127 @@ $('btn-curl').addEventListener('click', async () => {
 });
 
 // ── API Explorer ─────────────────────────────────────────
+let _apiEndpoints = [];
+let _selectedEp = null;
+
 $('btn-api-refresh').addEventListener('click', loadApiExplorer);
 
 async function loadApiExplorer() {
-  const container = $('api-endpoints-list');
-  container.innerHTML = '<div class="gpio-loading">Loading endpoints…</div>';
+  const list = $('api-endpoints-list');
+  const detail = $('api-tester-detail');
+  detail.classList.add('hidden');
+  list.innerHTML = '<div class="gpio-loading">Loading endpoints…</div>';
   try {
     const data = await apiFetch('/api/help');
-    const endpoints = data.endpoints || [];
-    if (!endpoints.length) {
-      container.innerHTML = '<div style="color:var(--text-dim);font-size:0.75rem">No endpoints returned.</div>';
+    _apiEndpoints = data.endpoints || [];
+    if (!_apiEndpoints.length) {
+      list.innerHTML = '<div style="color:var(--text-dim);font-size:0.75rem">No endpoints returned.</div>';
       return;
     }
-    container.innerHTML = '';
-    for (const ep of endpoints) {
-      const card = document.createElement('div');
-      card.className = 'api-tester';
+    list.innerHTML = '';
+    for (const ep of _apiEndpoints) {
+      const item = document.createElement('div');
+      item.className = 'api-list-item';
+      item.dataset.index = _apiEndpoints.indexOf(ep);
       const isPost = ep.method === 'POST';
-      const path = ep.path || '';
-      const params = ep.params || [];
-
-      let inputsHtml = '';
-      if (params.length) {
-        inputsHtml = '<div class="api-tester-inputs">';
-        for (const p of params) {
-          inputsHtml += `<div class="api-tester-input-row"><label class="field-label">${p}</label><input type="text" class="field-input" data-param="${p}" placeholder="${p}" /></div>`;
-        }
-        inputsHtml += '</div>';
-      }
-
-      card.innerHTML = `
-        <div class="api-tester-header">
-          <span class="api-tester-method">${isPost ? 'POST' : 'GET'}</span>
-          <span class="api-tester-path">${path}</span>
-        </div>
-        ${inputsHtml}
-        <div class="api-tester-actions">
-          <button class="btn-action btn-primary" style="font-size:0.65rem;padding:0.35rem 0.7rem">CALL</button>
-          <label class="api-tester-auth-toggle">
-            <input type="checkbox" ${ep.auth ? 'checked' : ''} data-auth />
-            <span>AUTH</span>
-          </label>
-        </div>
-        <div class="api-response hidden">
-          <button class="api-copy-btn">COPY</button>
-          <pre class="api-response-body" style="margin:0;font-family:inherit;white-space:pre-wrap"></pre>
-        </div>`;
-
-      const callBtn = card.querySelector('.btn-primary');
-      const authCb = card.querySelector('[data-auth]');
-      const respDiv = card.querySelector('.api-response');
-      const respBody = card.querySelector('.api-response-body');
-      const copyBtn = card.querySelector('.api-copy-btn');
-
-      callBtn.addEventListener('click', async () => {
-        callBtn.disabled = true;
-        callBtn.textContent = '⟳';
-        respDiv.classList.remove('hidden');
-        respBody.textContent = 'Calling...';
-        try {
-          const paramInputs = card.querySelectorAll('[data-param]');
-          const urlParams = new URLSearchParams();
-          const bodyParams = new URLSearchParams();
-          paramInputs.forEach(inp => {
-            if (inp.value.trim()) {
-              if (isPost) bodyParams.append(inp.dataset.param, inp.value.trim());
-              else urlParams.append(inp.dataset.param, inp.value.trim());
-            }
-          });
-          const qs = urlParams.toString();
-          const fullPath = qs ? path + '?' + qs : path;
-          const opts = { auth: authCb.checked };
-          if (isPost && bodyParams.toString()) {
-            opts.method = 'POST';
-            opts.body = bodyParams.toString();
-          }
-          const result = await apiFetch(fullPath, opts);
-          respBody.textContent = typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result);
-        } catch (err) {
-          respBody.textContent = `Error: ${err.message}`;
-        } finally {
-          callBtn.disabled = false;
-          callBtn.textContent = 'CALL';
-        }
-      });
-
-      copyBtn.addEventListener('click', () => {
-        navigator.clipboard.writeText(respBody.textContent).then(() => {
-          toast('Response copied', 'success', 1000);
-        }).catch(() => {
-          const ta = document.createElement('textarea');
-          ta.value = respBody.textContent;
-          document.body.appendChild(ta);
-          ta.select();
-          document.execCommand('copy');
-          ta.remove();
-          toast('Response copied', 'success', 1000);
-        });
-      });
-
-      container.appendChild(card);
+      item.innerHTML = `<span class="api-tester-method">${isPost ? 'POST' : 'GET'}</span><span class="api-tester-path">${ep.path}</span>`;
+      item.addEventListener('click', () => selectApiEndpoint(parseInt(item.dataset.index)));
+      list.appendChild(item);
     }
-    toast(`${endpoints.length} endpoints loaded`, 'success');
+    selectApiEndpoint(0);
+    toast(`${_apiEndpoints.length} endpoints loaded`, 'success');
   } catch (err) {
-    container.innerHTML = `<div style="color:var(--red);font-size:0.75rem">Failed: ${err.message}</div>`;
+    list.innerHTML = `<div style="color:var(--red);font-size:0.75rem">Failed: ${err.message}</div>`;
     toast('API load failed', 'error');
   }
 }
+
+function selectApiEndpoint(index) {
+  _selectedEp = _apiEndpoints[index];
+  if (!_selectedEp) return;
+  document.querySelectorAll('.api-list-item').forEach(el => el.classList.remove('active'));
+  const items = document.querySelectorAll('.api-list-item');
+  if (items[index]) items[index].classList.add('active');
+
+  const detail = $('api-tester-detail');
+  detail.classList.remove('hidden');
+  const isPost = _selectedEp.method === 'POST';
+  const path = _selectedEp.path || '';
+  const params = _selectedEp.params || [];
+
+  setText('api-detail-method', isPost ? 'POST' : 'GET');
+  setText('api-detail-path', path);
+
+  const paramsContainer = $('api-detail-params');
+  paramsContainer.innerHTML = '';
+  if (params.length) {
+    for (const p of params) {
+      const row = document.createElement('div');
+      row.className = 'api-tester-input-row';
+      row.innerHTML = `<label class="field-label">${p}</label><input type="text" class="field-input" data-param="${p}" placeholder="${p}" />`;
+      paramsContainer.appendChild(row);
+    }
+  }
+
+  const respDiv = $('api-detail-response');
+  respDiv.classList.add('hidden');
+}
+
+$('btn-api-call').addEventListener('click', async () => {
+  if (!_selectedEp) return;
+  const isPost = _selectedEp.method === 'POST';
+  const path = _selectedEp.path || '';
+  const authCb = $('api-detail-auth');
+  const respDiv = $('api-detail-response');
+  const respBody = $('api-detail-body');
+  const btn = $('btn-api-call');
+
+  btn.disabled = true;
+  btn.textContent = '⟳';
+  respDiv.classList.remove('hidden');
+  respBody.textContent = 'Calling...';
+
+  try {
+    const paramInputs = $('api-detail-params').querySelectorAll('[data-param]');
+    const urlParams = new URLSearchParams();
+    const bodyParams = new URLSearchParams();
+    paramInputs.forEach(inp => {
+      if (inp.value.trim()) {
+        if (isPost) bodyParams.append(inp.dataset.param, inp.value.trim());
+        else urlParams.append(inp.dataset.param, inp.value.trim());
+      }
+    });
+    const qs = urlParams.toString();
+    const fullPath = qs ? path + '?' + qs : path;
+    const opts = { auth: authCb.checked };
+    if (isPost && bodyParams.toString()) {
+      opts.method = 'POST';
+      opts.body = bodyParams.toString();
+    }
+    const result = await apiFetch(fullPath, opts);
+    respBody.textContent = typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result);
+  } catch (err) {
+    respBody.textContent = `Error: ${err.message}`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'CALL';
+  }
+});
+
+$('btn-api-copy').addEventListener('click', () => {
+  const text = $('api-detail-body').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    toast('Response copied', 'success', 1000);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+    toast('Response copied', 'success', 1000);
+  });
+});
 
 // ── Config Export/Import ──────────────────────────────────
 $('btn-config-export').addEventListener('click', async () => {
@@ -1142,6 +1219,18 @@ $('btn-reboot').addEventListener('click', async () => {
     toast('Rebooting...', 'warning', 5000);
   } catch (err) {
     showResult('reboot-result', `Reboot command sent (device may be offline): ${err.message}`, 'warning');
+  }
+});
+
+// ── Overview Reboot ─────────────────────────────────────
+$('btn-ov-reboot').addEventListener('click', async () => {
+  if (!confirm('Reboot the device? Connection will be lost.')) return;
+  try {
+    await apiFetch('/api/system/reboot', { method: 'POST', auth: true });
+    showResult('ov-reboot-result', 'Rebooting... device will be offline.', 'success');
+    toast('Rebooting...', 'warning', 5000);
+  } catch (err) {
+    showResult('ov-reboot-result', `Reboot sent: ${err.message}`, 'warning');
   }
 });
 
