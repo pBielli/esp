@@ -5,6 +5,7 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <WiFiClient.h>
+#include <WiFiClientSecure.h>
 
 String getDDNSIP() {
   IPAddress ip;
@@ -21,7 +22,6 @@ String getCachedDDNSIP() { return _cachedDDNSIP; }
 String getPublicIP() {
   String urls = String(cfg.public_ip_urls);
   HTTPClient http;
-  WiFiClient c;
   while (urls.length() > 0) {
     int comma = urls.indexOf(',');
     String host = (comma == -1) ? urls : urls.substring(0, comma);
@@ -29,6 +29,8 @@ String getPublicIP() {
     host.trim();
     if (host == "") continue;
     String url = "https://" + host;
+    WiFiClientSecure c;
+    c.setInsecure();
     http.begin(c, url);
     int code = http.GET();
     String ip = (code == HTTP_CODE_OK) ? http.getString() : "";
@@ -46,7 +48,6 @@ String getPublicIP() {
 String getPublicIP(int serverIdx) {
   String urls = String(cfg.public_ip_urls);
   HTTPClient http;
-  WiFiClient c;
   int idx = 0;
   while (urls.length() > 0) {
     int comma = urls.indexOf(',');
@@ -56,6 +57,8 @@ String getPublicIP(int serverIdx) {
     if (host == "") continue;
     if (idx == serverIdx) {
       String url = "https://" + host;
+      WiFiClientSecure c;
+      c.setInsecure();
       http.begin(c, url);
       int code = http.GET();
       String ip = (code == HTTP_CODE_OK) ? http.getString() : "";
@@ -70,13 +73,21 @@ String getPublicIP(int serverIdx) {
 
 String updateDDNS(String ip) {
   HTTPClient http;
-  WiFiClient c;
   String url = String(cfg.ddns_upd_url);
   url.replace("$domain", String(cfg.ddns_domain));
   url.replace("$token", String(cfg.ddns_token));
   url.replace("$ip", ip);
-  http.begin(c, url);
-  int code = http.GET();
+  int code;
+  if (url.startsWith("https://")) {
+    WiFiClientSecure c;
+    c.setInsecure();
+    http.begin(c, url);
+    code = http.GET();
+  } else {
+    WiFiClient c;
+    http.begin(c, url);
+    code = http.GET();
+  }
   String resp = "";
   if (code == HTTP_CODE_OK) {
     resp = http.getString();
