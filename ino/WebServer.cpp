@@ -304,22 +304,39 @@ void setupRoutes() {
   server.on("/api/curl", []() {
     if (!checkAuth()) return;
     String url = server.arg("url");
-    if (url == "") { server.send(400, "application/json", "{\"error\":\"Missing url\"}"); return; }
+    if (url == "") { sendCORS(); server.send(400, "application/json", "{\"error\":\"Missing url\"}"); return; }
+    if (!url.startsWith("http://") && !url.startsWith("https://")) { sendCORS(); server.send(400, "application/json", "{\"error\":\"Invalid protocol\"}"); return; }
+    if (WiFi.status() != WL_CONNECTED) { sendCORS(); server.send(503, "application/json", "{\"error\":\"WiFi not connected\"}"); return; }
     HTTPClient http; int code; String payload;
+    http.setTimeout(10000);
+    http.setUserAgent("ESP-DDNS/1.0");
+    WiFiClientSecure cSecure;
+    WiFiClient cPlain;
     if (url.startsWith("https://")) {
-      WiFiClientSecure c;
-      c.setInsecure();
-      http.begin(c, url);
-      code = http.GET();
-      payload = (code == HTTP_CODE_OK) ? http.getString() : "Error: " + String(code);
-      http.end();
+      cSecure.setInsecure();
+      http.begin(cSecure, url);
     } else {
-      WiFiClient c;
-      http.begin(c, url);
-      code = http.GET();
-      payload = (code == HTTP_CODE_OK) ? http.getString() : "Error: " + String(code);
-      http.end();
+      http.begin(cPlain, url);
     }
+    code = http.GET();
+    if (code == HTTP_CODE_OK) {
+      WiFiClient *s = http.getStreamPtr();
+      if (s) {
+        int maxSize = 10240, total = 0;
+        unsigned long timeout = millis() + 5000;
+        while (millis() < timeout && total < maxSize) {
+          if (s->available()) {
+            payload += (char)s->read();
+            total++;
+            timeout = millis() + 5000;
+          }
+        }
+        if (total >= maxSize) payload += "\n[TRUNCATED at 10KB]";
+      }
+    } else {
+      payload = "Error: " + String(code);
+    }
+    http.end();
     server.send(200, "text/plain", payload);
   });
 

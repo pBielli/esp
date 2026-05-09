@@ -1,6 +1,6 @@
 #include "Ping.h"
 #include <ESP8266WiFi.h>
-#include <ESPping.h>
+#include <ESP8266Ping.h>
 
 String pingHost(String host) {
   IPAddress ip;
@@ -10,9 +10,9 @@ String pingHost(String host) {
     }
   }
   bool success = Ping.ping(ip, 3);
-  float avg = Ping.averageTime();
+  int avg = Ping.averageTime();
   char buf[160];
-  snprintf(buf, sizeof(buf), "{\"host\":\"%s\",\"ip\":\"%s\",\"success\":%s,\"rtt_ms\":%.1f}",
+  snprintf(buf, sizeof(buf), "{\"host\":\"%s\",\"ip\":\"%s\",\"success\":%s,\"rtt_ms\":%d}",
            host.c_str(), ip.toString().c_str(), success ? "true" : "false", avg);
   return String(buf);
 }

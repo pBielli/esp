@@ -22,6 +22,8 @@ String getCachedDDNSIP() { return _cachedDDNSIP; }
 String getPublicIP() {
   String urls = String(cfg.public_ip_urls);
   HTTPClient http;
+  http.setTimeout(10000);
+  http.setUserAgent("ESP-DDNS/1.0");
   while (urls.length() > 0) {
     int comma = urls.indexOf(',');
     String host = (comma == -1) ? urls : urls.substring(0, comma);
@@ -48,6 +50,8 @@ String getPublicIP() {
 String getPublicIP(int serverIdx) {
   String urls = String(cfg.public_ip_urls);
   HTTPClient http;
+  http.setTimeout(10000);
+  http.setUserAgent("ESP-DDNS/1.0");
   int idx = 0;
   while (urls.length() > 0) {
     int comma = urls.indexOf(',');
@@ -73,6 +77,8 @@ String getPublicIP(int serverIdx) {
 
 String updateDDNS(String ip) {
   HTTPClient http;
+  http.setTimeout(10000);
+  http.setUserAgent("ESP-DDNS/1.0");
   String url = String(cfg.ddns_upd_url);
   url.replace("$domain", String(cfg.ddns_domain));
   url.replace("$token", String(cfg.ddns_token));
