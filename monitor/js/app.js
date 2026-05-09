@@ -13,6 +13,7 @@ const state = {
   deviceEpoch: 0,
   tzOffset: 0,
   lastTimeSync: 0,
+  bootEpoch: null,
 };
 
 // ── Utils ──────────────────────────────────────────────────
@@ -211,9 +212,13 @@ $('btn-refresh').addEventListener('click', refreshAll);
 function updateInfoCard(info) {
   // SYSTEM card
   setText('info-fw-version', info.firmware || '—');
-  setText('info-mdns',      info.mdns        || '—');
   setText('info-mac',       info.mac         || '—');
-  setText('info-uptime',    info.uptime      ? formatUptime(info.uptime) : '—');
+  if (info.uptime) {
+    state.lastUptime = info.uptime;
+    setText('info-uptime', formatUptime(info.uptime));
+  } else {
+    setText('info-uptime', '—');
+  }
   if (info.free_heap != null) {
     const kb = Math.round(info.free_heap / 1024);
     setText('info-heap-pct', kb + ' KB');
@@ -236,6 +241,7 @@ function updateInfoCard(info) {
   setText('info-subnet',    info.subnet      || '—');
   setText('info-dns1',      info.dns1        || '—');
   setText('info-dns2',      info.dns2        || '—');
+  setText('info-mdns',     info.mdns        || '—');
 
   // CONFIG card
   setText('info-ntp-server', info.ntp_server || '—');
@@ -286,6 +292,23 @@ function formatUptime(seconds) {
   return `${h}h ${m}m ${sec}s`;
 }
 
+// ── DDNS Indicator click → force update ──────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const indicator = $('ddns-indicator');
+  if (indicator) {
+    indicator.style.cursor = 'pointer';
+    indicator.addEventListener('click', async () => {
+      try {
+        const data = await apiFetch('/api/ddns/update', { auth: true });
+        toast('DDNS update: ' + data.status, 'success');
+        setTimeout(refreshAll, 2000);
+      } catch (err) {
+        toast('DDNS update failed: ' + err.message, 'error');
+      }
+    });
+  }
+});
+
 // ── Time ───────────────────────────────────────────────────
 function formatTimeFromEpoch(epoch) {
   const d = new Date((epoch + state.tzOffset) * 1000);
@@ -302,6 +325,9 @@ async function loadTime() {
       state.deviceEpoch = data.epoch;
       state.tzOffset = data.tz_offset;
       state.lastTimeSync = Date.now();
+      if (state.lastUptime != null) {
+        state.bootEpoch = data.epoch - state.lastUptime;
+      }
       const { time, date } = formatTimeFromEpoch(data.epoch);
       setText('device-time', time);
       setText('device-date', date);
@@ -320,6 +346,10 @@ function tickClock() {
   setText('device-time', time);
   setText('device-date', date);
   setText('topbar-time', time);
+  if (state.bootEpoch != null) {
+    const uptime = current - state.bootEpoch;
+    setText('info-uptime', formatUptime(uptime));
+  }
 }
 
 // ── Tabs ───────────────────────────────────────────────────
@@ -333,8 +363,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     // Lazy-load tab data
     if (btn.dataset.tab === 'gpio') loadGpioInfo();
     if (btn.dataset.tab === 'log') loadLog();
-    if (btn.dataset.tab === 'led') loadLedInvert();
-    if (btn.dataset.tab === 'ddns') loadDdnsConfig();
+    if (btn.dataset.tab === 'ddns') { loadDdnsConfig(); loadLedInvert(); }
     if (btn.dataset.tab === 'network') loadNetworkTab();
     if (btn.dataset.tab === 'system') loadSystemTab();
   });
@@ -975,9 +1004,13 @@ $('btn-config-import').addEventListener('change', async (e) => {
 // ── System Tab ────────────────────────────────────────────
 async function loadSystemTab() {
   try {
-    const data = await apiFetch('/api/system/version', { auth: true });
-    setText('sys-version', data.version || '—');
-    setText('sys-build',   data.build_date || '—');
+    const [ver, info] = await Promise.all([
+      apiFetch('/api/system/version', { auth: true }),
+      apiFetch('/api/info')
+    ]);
+    setText('sys-version', ver.version || '—');
+    setText('sys-build',   ver.build_date || '—');
+    if (info.mdns) $('mdns-name').value = info.mdns;
   } catch {}
 }
 

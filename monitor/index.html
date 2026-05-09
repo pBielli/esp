@@ -122,7 +122,6 @@
       <button class="tab-btn active" data-tab="overview">OVERVIEW</button>
       <button class="tab-btn" data-tab="ddns">DDNS</button>
       <button class="tab-btn" data-tab="gpio">GPIO</button>
-      <button class="tab-btn" data-tab="led">LED</button>
       <button class="tab-btn" data-tab="wifi">WIFI</button>
       <button class="tab-btn" data-tab="network">NETWORK</button>
       <button class="tab-btn" data-tab="system">SYSTEM</button>
@@ -144,10 +143,9 @@
             </div>
             <div class="info-grid">
               <div class="info-item"><span class="info-label">FW VERSION</span><span class="info-val" id="info-fw-version">—</span></div>
-              <div class="info-item"><span class="info-label">mDNS</span><span class="info-val" id="info-mdns">—</span></div>
-              <div class="info-item"><span class="info-label">MAC</span><span class="info-val" id="info-mac">—</span></div>
               <div class="info-item"><span class="info-label">UPTIME</span><span class="info-val" id="info-uptime">—</span></div>
               <div class="info-item"><span class="info-label">FREE HEAP</span><span class="info-val" id="info-heap-pct">—</span></div>
+              <div class="info-item"><span class="info-label">MAC</span><span class="info-val" id="info-mac">—</span></div>
               <div class="info-item"><span class="info-label">LOCAL IP</span><span class="info-val" id="info-local-ip">—</span></div>
               <div class="info-item"><span class="info-label">IP MODE</span><span class="info-val" id="info-ip-mode">—</span></div>
             </div>
@@ -166,6 +164,7 @@
               <div class="info-item"><span class="info-label">SUBNET</span><span class="info-val" id="info-subnet">—</span></div>
               <div class="info-item"><span class="info-label">DNS 1</span><span class="info-val" id="info-dns1">—</span></div>
               <div class="info-item"><span class="info-label">DNS 2</span><span class="info-val" id="info-dns2">—</span></div>
+              <div class="info-item"><span class="info-label">mDNS</span><span class="info-val" id="info-mdns">—</span></div>
             </div>
           </div>
 
@@ -218,21 +217,6 @@
   <!-- DDNS -->
   <section class="tab-pane" id="tab-ddns">
     <div class="cards-grid">
-
-      <div class="card card--wide">
-        <div class="card-header">
-          <span class="card-icon">⬡</span>
-          <span class="card-title">DDNS CONTROL</span>
-        </div>
-        <div class="action-block">
-          <p class="action-desc">Force an immediate DuckDNS update cycle. The device will push the current public IP to
-            the DDNS provider.</p>
-          <button class="btn-action btn-primary" id="btn-ddns-update">
-            <span>⟳</span> FORCE UPDATE
-          </button>
-          <div class="action-result hidden" id="ddns-update-result"></div>
-        </div>
-      </div>
 
       <div class="card card--wide">
         <div class="card-header">
@@ -311,40 +295,6 @@
 
       <div class="card card--wide">
         <div class="card-header">
-          <span class="card-icon">◈</span>
-          <span class="card-title">PUBLIC IP CHECK</span>
-        </div>
-        <div class="action-block">
-          <p class="action-desc">Select a server and fetch your current public IP address.</p>
-          <div class="inline-form">
-            <select class="field-input inline-input" id="ipcheck-server">
-              <option value="0">Server 1</option>
-              <option value="1">Server 2</option>
-            </select>
-            <button class="btn-action btn-primary" id="btn-ipcheck">CHECK IP</button>
-          </div>
-          <div class="action-result hidden" id="ipcheck-result"></div>
-        </div>
-      </div>
-
-      <div class="card card--wide">
-        <div class="card-header">
-          <span class="card-icon">◎</span>
-          <span class="card-title">DNS RESOLVER</span>
-        </div>
-        <div class="action-block">
-          <p class="action-desc">Resolve any hostname to its IP address using the device's DNS stack.</p>
-          <div class="inline-form">
-            <input type="text" class="field-input inline-input" id="resolve-host"
-              placeholder="hostname (e.g. google.com)" />
-            <button class="btn-action btn-primary" id="btn-resolve">RESOLVE</button>
-          </div>
-          <div class="action-result hidden" id="resolve-result"></div>
-        </div>
-      </div>
-
-      <div class="card card--wide">
-        <div class="card-header">
           <span class="card-icon">◷</span>
           <span class="card-title">CHECK INTERVAL</span>
         </div>
@@ -355,6 +305,70 @@
             <button class="btn-action btn-primary" id="btn-ddns-interval-save">SAVE INTERVAL</button>
           </div>
           <div class="action-result hidden" id="ddns-interval-result"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-icon">◉</span>
+          <span class="card-title">LED STATE</span>
+        </div>
+        <div class="led-visual" id="led-visual">
+          <div class="led-bulb" id="led-bulb"></div>
+          <div class="led-label" id="led-state-label">UNKNOWN</div>
+          <div class="led-pin-label">PIN: <span id="led-pin-display">—</span></div>
+        </div>
+        <div class="led-controls">
+          <button class="btn-action btn-led-on" id="btn-led-on">ON</button>
+          <button class="btn-action btn-led-off" id="btn-led-off">OFF</button>
+        </div>
+        <div class="led-invert-block">
+          <label class="toggle-label">
+            <span class="toggle-text">INVERT OUTPUT</span>
+            <span class="toggle-switch" id="led-invert-toggle">
+              <span class="toggle-slider"></span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-icon">◌</span>
+          <span class="card-title">BLINK</span>
+        </div>
+        <div class="blink-form">
+          <label class="field-label">BLINK COUNT</label>
+          <div class="blink-counter">
+            <button class="counter-btn" id="blink-dec">−</button>
+            <span class="counter-val" id="blink-count">5</span>
+            <button class="counter-btn" id="blink-inc">+</button>
+          </div>
+          <button class="btn-action btn-primary" id="btn-blink">BLINK</button>
+          <div class="action-result hidden" id="blink-result"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-icon">⊕</span>
+          <span class="card-title">CHANGE PIN</span>
+        </div>
+        <div class="action-block">
+          <label class="field-label">LED PIN</label>
+          <select class="field-select" id="led-pin-sel">
+            <option value="0">GPIO 0</option>
+            <option value="2" selected>GPIO 2</option>
+            <option value="4">GPIO 4</option>
+            <option value="5">GPIO 5</option>
+            <option value="12">GPIO 12</option>
+            <option value="13">GPIO 13</option>
+            <option value="14">GPIO 14</option>
+            <option value="15">GPIO 15</option>
+            <option value="16">GPIO 16</option>
+          </select>
+          <button class="btn-action btn-primary" id="btn-led-pin">SAVE PIN</button>
+          <div class="action-result hidden" id="led-pin-result"></div>
         </div>
       </div>
 
@@ -469,74 +483,7 @@
     </div>
   </section>
 
-  <!-- LED -->
-  <section class="tab-pane" id="tab-led">
-    <div class="cards-grid">
-      <div class="card">
-        <div class="card-header">
-          <span class="card-icon">◉</span>
-          <span class="card-title">LED STATE</span>
-        </div>
-        <div class="led-visual" id="led-visual">
-          <div class="led-bulb" id="led-bulb"></div>
-          <div class="led-label" id="led-state-label">UNKNOWN</div>
-          <div class="led-pin-label">PIN: <span id="led-pin-display">—</span></div>
-        </div>
-        <div class="led-controls">
-          <button class="btn-action btn-led-on" id="btn-led-on">ON</button>
-          <button class="btn-action btn-led-off" id="btn-led-off">OFF</button>
-        </div>
-        <div class="led-invert-block">
-          <label class="toggle-label">
-            <span class="toggle-text">INVERT OUTPUT</span>
-            <span class="toggle-switch" id="led-invert-toggle">
-              <span class="toggle-slider"></span>
-            </span>
-          </label>
-        </div>
-      </div>
 
-      <div class="card">
-        <div class="card-header">
-          <span class="card-icon">◌</span>
-          <span class="card-title">BLINK</span>
-        </div>
-        <div class="blink-form">
-          <label class="field-label">BLINK COUNT</label>
-          <div class="blink-counter">
-            <button class="counter-btn" id="blink-dec">−</button>
-            <span class="counter-val" id="blink-count">5</span>
-            <button class="counter-btn" id="blink-inc">+</button>
-          </div>
-          <button class="btn-action btn-primary" id="btn-blink">BLINK</button>
-          <div class="action-result hidden" id="blink-result"></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <span class="card-icon">⊕</span>
-          <span class="card-title">CHANGE PIN</span>
-        </div>
-        <div class="action-block">
-          <label class="field-label">LED PIN</label>
-          <select class="field-select" id="led-pin-sel">
-            <option value="0">GPIO 0</option>
-            <option value="2" selected>GPIO 2</option>
-            <option value="4">GPIO 4</option>
-            <option value="5">GPIO 5</option>
-            <option value="12">GPIO 12</option>
-            <option value="13">GPIO 13</option>
-            <option value="14">GPIO 14</option>
-            <option value="15">GPIO 15</option>
-            <option value="16">GPIO 16</option>
-          </select>
-          <button class="btn-action btn-primary" id="btn-led-pin">SAVE PIN</button>
-          <div class="action-result hidden" id="led-pin-result"></div>
-        </div>
-      </div>
-    </div>
-  </section>
 
   <!-- WIFI -->
   <section class="tab-pane" id="tab-wifi">
@@ -611,28 +558,43 @@
 
       <div class="card card--wide">
         <div class="card-header">
-          <span class="card-icon">◈</span>
-          <span class="card-title">mDNS CONFIGURATION</span>
+          <span class="card-icon">◎</span>
+          <span class="card-title">IP CONFIGURATION</span>
         </div>
         <div class="action-block">
-          <div class="inline-form">
-            <input type="text" class="field-input inline-input" id="mdns-name" placeholder="ddns-checker" />
-            <button class="btn-action btn-primary" id="btn-mdns-save">SAVE mDNS</button>
+          <div class="form-row">
+            <div class="form-field">
+              <label class="toggle-label">
+                <span class="toggle-text">DHCP</span>
+                <span class="toggle-switch" id="ip-mode-toggle">
+                  <span class="toggle-slider"></span>
+                </span>
+                <span class="toggle-text">STATIC</span>
+              </label>
+            </div>
           </div>
-          <div class="field-hint" style="margin-top:0.3rem">Changes take effect on next device reboot.</div>
-          <div class="action-result hidden" id="mdns-result"></div>
-        </div>
-      </div>
-
-      <div class="card card--wide">
-        <div class="card-header">
-          <span class="card-icon">⌁</span>
-          <span class="card-title">WIFI SCAN</span>
-          <button class="card-action-btn" id="btn-wifi-scan">SCAN</button>
-        </div>
-        <div class="action-block">
-          <div class="scan-status" id="scan-status">Click SCAN to list available networks.</div>
-          <div class="scan-results hidden" id="scan-results"></div>
+          <div class="ip-static-fields" id="ip-static-fields">
+            <div class="form-row">
+              <div class="form-field">
+                <label class="field-label">IP ADDRESS</label>
+                <input type="text" class="field-input" id="ip-addr" placeholder="192.168.1.100" />
+              </div>
+              <div class="form-field">
+                <label class="field-label">GATEWAY</label>
+                <input type="text" class="field-input" id="ip-gateway" placeholder="192.168.1.1" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-field">
+                <label class="field-label">SUBNET</label>
+                <input type="text" class="field-input" id="ip-subnet" placeholder="255.255.255.0" />
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <button class="btn-action btn-primary" id="btn-ip-save">SAVE IP CONFIG</button>
+          </div>
+          <div class="action-result hidden" id="ip-result"></div>
         </div>
       </div>
 
@@ -679,48 +641,6 @@
         </div>
       </div>
 
-      <div class="card card--wide">
-        <div class="card-header">
-          <span class="card-icon">◎</span>
-          <span class="card-title">IP CONFIGURATION</span>
-        </div>
-        <div class="action-block">
-          <div class="form-row">
-            <div class="form-field">
-              <label class="toggle-label">
-                <span class="toggle-text">DHCP</span>
-                <span class="toggle-switch" id="ip-mode-toggle">
-                  <span class="toggle-slider"></span>
-                </span>
-                <span class="toggle-text">STATIC</span>
-              </label>
-            </div>
-          </div>
-          <div class="ip-static-fields" id="ip-static-fields">
-            <div class="form-row">
-              <div class="form-field">
-                <label class="field-label">IP ADDRESS</label>
-                <input type="text" class="field-input" id="ip-addr" placeholder="192.168.1.100" />
-              </div>
-              <div class="form-field">
-                <label class="field-label">GATEWAY</label>
-                <input type="text" class="field-input" id="ip-gateway" placeholder="192.168.1.1" />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-field">
-                <label class="field-label">SUBNET</label>
-                <input type="text" class="field-input" id="ip-subnet" placeholder="255.255.255.0" />
-              </div>
-            </div>
-          </div>
-          <div class="form-row">
-            <button class="btn-action btn-primary" id="btn-ip-save">SAVE IP CONFIG</button>
-          </div>
-          <div class="action-result hidden" id="ip-result"></div>
-        </div>
-      </div>
-
     </div>
   </section>
 
@@ -760,6 +680,33 @@
           <p class="action-desc">Reset ALL settings to factory defaults and reboot. This cannot be undone.</p>
           <button class="btn-action btn-primary" id="btn-factory-reset">⚠ FACTORY RESET</button>
           <div class="action-result hidden" id="factory-reset-result"></div>
+        </div>
+      </div>
+
+      <div class="card card--wide">
+        <div class="card-header">
+          <span class="card-icon">◈</span>
+          <span class="card-title">mDNS CONFIGURATION</span>
+        </div>
+        <div class="action-block">
+          <div class="inline-form">
+            <input type="text" class="field-input inline-input" id="mdns-name" placeholder="ddns-checker" />
+            <button class="btn-action btn-primary" id="btn-mdns-save">SAVE mDNS</button>
+          </div>
+          <div class="field-hint" style="margin-top:0.3rem">Changes take effect on next device reboot.</div>
+          <div class="action-result hidden" id="mdns-result"></div>
+        </div>
+      </div>
+
+      <div class="card card--wide">
+        <div class="card-header">
+          <span class="card-icon">⌦</span>
+          <span class="card-title">API EXPLORER</span>
+        </div>
+        <div class="action-block">
+          <p class="action-desc">Browse all available API endpoints as reported by the device.</p>
+          <button class="btn-action btn-secondary" id="btn-api-help">LOAD ENDPOINTS</button>
+          <div class="api-list hidden" id="api-list"></div>
         </div>
       </div>
 
@@ -803,13 +750,62 @@
 
       <div class="card card--wide">
         <div class="card-header">
-          <span class="card-icon">⌦</span>
-          <span class="card-title">API EXPLORER</span>
+          <span class="card-icon">⌁</span>
+          <span class="card-title">WIFI SCAN</span>
+          <button class="card-action-btn" id="btn-wifi-scan">SCAN</button>
         </div>
         <div class="action-block">
-          <p class="action-desc">Browse all available API endpoints as reported by the device.</p>
-          <button class="btn-action btn-secondary" id="btn-api-help">LOAD ENDPOINTS</button>
-          <div class="api-list hidden" id="api-list"></div>
+          <div class="scan-status" id="scan-status">Click SCAN to list available networks.</div>
+          <div class="scan-results hidden" id="scan-results"></div>
+        </div>
+      </div>
+
+      <div class="card card--wide">
+        <div class="card-header">
+          <span class="card-icon">⬡</span>
+          <span class="card-title">DDNS CONTROL</span>
+        </div>
+        <div class="action-block">
+          <p class="action-desc">Force an immediate DuckDNS update cycle. The device will push the current public IP to
+            the DDNS provider.</p>
+          <button class="btn-action btn-primary" id="btn-ddns-update">
+            <span>⟳</span> FORCE UPDATE
+          </button>
+          <div class="action-result hidden" id="ddns-update-result"></div>
+        </div>
+      </div>
+
+      <div class="card card--wide">
+        <div class="card-header">
+          <span class="card-icon">◈</span>
+          <span class="card-title">PUBLIC IP CHECK</span>
+        </div>
+        <div class="action-block">
+          <p class="action-desc">Select a server and fetch your current public IP address.</p>
+          <div class="inline-form">
+            <select class="field-input inline-input" id="ipcheck-server">
+              <option value="0">Server 1</option>
+              <option value="1">Server 2</option>
+            </select>
+            <button class="btn-action btn-primary" id="btn-ipcheck">CHECK IP</button>
+          </div>
+          <div class="action-result hidden" id="ipcheck-result"></div>
+        </div>
+      </div>
+
+      <div class="card card--wide">
+        <div class="card-header">
+          <span class="card-icon">◎</span>
+          <span class="card-title">DNS RESOLVER</span>
+        </div>
+        <div class="action-block">
+          <p class="action-desc">Resolve any hostname to its IP address using the device's DNS stack.</p>
+          <div class="inline-form">
+            <input type="text" class="field-input inline-input" id="resolve-host"
+              placeholder="hostname (e.g. google.com)" />
+            <button class="btn-action btn-primary" id="btn-resolve">RESOLVE</button>
+          </div>
+          <div class="action-result hidden" id="resolve-result"></div>
         </div>
       </div>
 
