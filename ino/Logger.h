@@ -12,6 +12,7 @@ struct LogEntry {
 
 void logBegin();
 void logAdd(unsigned long ms, String msg);
+void logPrint(const String& tag, const String& msg);
 String logGet();
 
 #endif

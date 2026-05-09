@@ -1,5 +1,6 @@
 #include "NTP.h"
 #include "Config.h"
+#include "Logger.h"
 
 WiFiUDP ntpUdp;
 unsigned long lastNtpSync = 0;
@@ -8,18 +9,17 @@ const unsigned long ntpSyncInterval = 86400000;
 void ntpBegin() {
   configTime(cfg.tz_offset, 0, cfg.ntp_server);
   delay(500);
-  Serial.print("Syncing NTP");
+  logPrint("NTP", "Syncing from " + String(cfg.ntp_server));
   for (int i = 0; i < 10; i++) {
     time_t now = time(nullptr);
     if (now > 100000) {
       lastNtpSync = millis();
-      Serial.println(" OK");
+      logPrint("NTP", "Sync OK");
       return;
     }
     delay(500);
-    Serial.print(".");
   }
-  Serial.println(" FAILED");
+  logPrint("NTP", "Sync FAILED");
 }
 
 String ntpGetTime() {

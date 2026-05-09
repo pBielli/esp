@@ -662,6 +662,23 @@ body {
   letter-spacing: 0.1em;
 }
 
+.gpio-pin.high {
+  border-color: var(--green);
+  background: rgba(0,255,136,0.1);
+}
+
+.gpio-pin.low {
+  border-color: var(--red-dim);
+  background: rgba(255,51,85,0.08);
+}
+
+.gpio-live-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-right: 0.5rem;
+}
+
 .gpio-loading { color: var(--text-dim); font-size: 0.8rem; grid-column: 1/-1; }
 
 /* GPIO Control */

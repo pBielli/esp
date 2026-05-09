@@ -26,19 +26,18 @@ void setup() {
   storageLoad();
   if (!storageInitialized()) {
     storageReset();
-    logAdd(millis(), "Config reset to default");
+    logPrint("CONFIG", "reset to default");
   }
 
   pinMode(cfg.led_pin, OUTPUT);
   digitalWrite(cfg.led_pin, cfg.led_invert ? LOW : HIGH);
 
   WiFi.begin(cfg.wifi_ssid, cfg.wifi_password);
-  Serial.print("WiFi: Connecting to "+String(cfg.wifi_ssid));
+  logPrint("WIFI", "Connecting to " + String(cfg.wifi_ssid));
   int wifiTimeout = 40;
   while (WiFi.status() != WL_CONNECTED && wifiTimeout > 0) { delay(500); Serial.print("."); wifiTimeout--; }
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println(" " + WiFi.localIP().toString());
-    logAdd(millis(), "WiFi connected: " + WiFi.localIP().toString());
+    logPrint("WIFI", "Connected: " + WiFi.localIP().toString());
   } else {
     Serial.println(" FAILED (will retry in loop)");
   }
@@ -47,14 +46,14 @@ void setup() {
   validateNetworkConfig();
 
   ntpBegin();
-  logAdd(millis(), "Time: " + ntpGetTime());
+  logPrint("NTP", "Time: " + ntpGetTime());
 
   if (MDNS.begin(cfg.mdns_name)) {
-    Serial.println("mDNS: " + String(cfg.mdns_name) + ".local");
+    logPrint("mDNS", String(cfg.mdns_name) + ".local");
   }
 
   setupRoutes();
-  logAdd(millis(), "System started");
+  logPrint("SYS", "System started");
   lastCheck = millis();
 }
 
@@ -65,14 +64,13 @@ void loop() {
     static unsigned long lastWifiRetry = 0;
     if (millis() - lastWifiRetry > 30000) {
       lastWifiRetry = millis();
-      Serial.print("WiFi: Reconnecting to "+String(cfg.wifi_ssid));
+      logPrint("WIFI", "Reconnecting to " + String(cfg.wifi_ssid));
       WiFi.begin(cfg.wifi_ssid, cfg.wifi_password);
       int wifiTimeout = 20;
       while (WiFi.status() != WL_CONNECTED && wifiTimeout > 0) { delay(500); Serial.print("."); wifiTimeout--; }
         Serial.println("");
       if (WiFi.status() == WL_CONNECTED) {
-        Serial.println(" OK " + WiFi.localIP().toString());
-        logAdd(millis(), "WiFi reconnected: " + WiFi.localIP().toString());
+        logPrint("WIFI", "Reconnected: " + WiFi.localIP().toString());
         if (cfg.use_static_ip) {
           IPAddress ip, gw, subnet, dns1, dns2;
           ip.fromString(cfg.static_ip);
@@ -96,7 +94,7 @@ void loop() {
           dns1.fromString(cfg.static_dns1);
           dns2.fromString(cfg.static_dns2);
           WiFi.config(ip, gw, subnet, dns1, dns2);
-          logAdd(millis(), "Custom DNS applied: " + String(cfg.static_ip) + " / " + String(cfg.static_dns1) + ", " + String(cfg.static_dns2));
+          logPrint("DNS", "Custom DNS: " + String(cfg.static_ip) + " / " + String(cfg.static_dns1) + ", " + String(cfg.static_dns2));
         }
         validateNetworkConfig();
       }
@@ -112,12 +110,10 @@ void loop() {
     else {
       count_ddns_update_failures++;
       if(count_ddns_update_failures>=3){
-        Serial.println("DDNS check failed "+String(count_ddns_update_failures)+" times");
-        logAdd(millis(), "DDNS check failed "+String(count_ddns_update_failures)+" times");
+        logPrint("DDNS", "Check failed " + String(count_ddns_update_failures) + " times");
         ledBlink(count_ddns_update_failures);
       } else {
-        Serial.println("DDNS check failed "+String(count_ddns_update_failures)+" times, will try to update DDNS");
-        logAdd(millis(), "DDNS check failed "+String(count_ddns_update_failures)+" times, will try to update DDNS");
+        logPrint("DDNS", "Check failed " + String(count_ddns_update_failures) + " times, will update");
         checkAndUpdateDDNS();
       }}
     lastCheck = millis();

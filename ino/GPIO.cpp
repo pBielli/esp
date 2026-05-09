@@ -26,7 +26,7 @@ String gpioInfo() {
   for (int i = 0; i <= 16; i++) {
     out += "{\"pin\":" + String(i);
     if (i == 0 || i == 2 || i == 4 || i == 5 || i == 12 || i == 13 || i == 14 || i == 15 || i == 16) {
-      out += ",\"available\":true}";
+      out += ",\"available\":true,\"value\":" + String(digitalRead(i)) + "}";
     } else {
       out += ",\"available\":false}";
     }
@@ -34,6 +34,21 @@ String gpioInfo() {
   }
   out += "]}";
   return out;
+}
+
+String gpioBlink(int pin, int times) {
+  if (pin < 0 || pin > 16) return "{\"error\":\"Invalid pin\"}";
+  if (times < 1 || times > 100) times = 5;
+  pinMode(pin, OUTPUT);
+  for (int i = 0; i < times; i++) {
+    digitalWrite(pin, HIGH);
+    delay(200);
+    digitalWrite(pin, LOW);
+    delay(200);
+  }
+  char buf[64];
+  snprintf(buf, sizeof(buf), "{\"pin\":%d,\"blinked\":%d}", pin, times);
+  return String(buf);
 }
 
 void ledOn() {

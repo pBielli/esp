@@ -309,6 +309,29 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// ── Connectivity Check ─────────────────────────────────────
+$('btn-conn-check').addEventListener('click', async () => {
+  const gwEl = $('conn-gateway');
+  const inetEl = $('conn-internet');
+  gwEl.textContent = '⟳';
+  inetEl.textContent = '⟳';
+  try {
+    const info = await apiFetch('/api/info');
+    const gateway = info.gateway || '8.8.8.8';
+    const [gwRes, inetRes] = await Promise.all([
+      apiFetch(`/api/ping?host=${encodeURIComponent(gateway)}`, { auth: true }),
+      apiFetch('/api/ping?host=8.8.8.8', { auth: true })
+    ]);
+    gwEl.textContent = gwRes.success ? `✓ ${gwRes.rtt_ms}ms` : '✕ FAIL';
+    inetEl.textContent = inetRes.success ? `✓ ${inetRes.rtt_ms}ms` : '✕ FAIL';
+    toast('Connectivity check done', 'success');
+  } catch (err) {
+    gwEl.textContent = 'ERR';
+    inetEl.textContent = 'ERR';
+    toast('Connectivity check failed', 'error');
+  }
+});
+
 // ── Time ───────────────────────────────────────────────────
 function formatTimeFromEpoch(epoch) {
   const d = new Date((epoch + state.tzOffset) * 1000);
@@ -517,8 +540,10 @@ async function loadGpioInfo() {
     grid.innerHTML = '';
     for (const p of pins) {
       const div = document.createElement('div');
-      div.className = `gpio-pin ${p.available ? 'available' : 'unavailable'}`;
-      div.innerHTML = `<span class="gpio-pin-num">${p.pin}</span><span class="gpio-pin-state">${p.available ? 'AVAIL' : 'N/A'}</span>`;
+      const valueClass = p.available && p.value !== undefined ? (p.value === 1 ? 'high' : 'low') : '';
+      div.className = `gpio-pin ${p.available ? 'available' : 'unavailable'} ${valueClass}`;
+      const stateText = p.available ? (p.value !== undefined ? `V: ${p.value}` : 'AVAIL') : 'N/A';
+      div.innerHTML = `<span class="gpio-pin-num">${p.pin}</span><span class="gpio-pin-state">${stateText}</span>`;
       if (p.available) {
         div.title = `GPIO ${p.pin} — Click to read`;
         div.addEventListener('click', () => {
@@ -535,6 +560,23 @@ async function loadGpioInfo() {
 
 $('btn-gpio-refresh').addEventListener('click', loadGpioInfo);
 
+// ── GPIO Live Refresh ──────────────────────────────────────
+let gpioLiveInterval = null;
+
+$('gpio-live-toggle').addEventListener('click', () => {
+  const toggle = $('gpio-live-toggle');
+  toggle.classList.toggle('active');
+  if (toggle.classList.contains('active')) {
+    const interval = parseInt($('gpio-live-interval').value) || 5;
+    gpioLiveInterval = setInterval(loadGpioInfo, Math.max(1, interval) * 1000);
+    toast(`GPIO live refresh ON (${interval}s)`, 'success');
+  } else {
+    clearInterval(gpioLiveInterval);
+    gpioLiveInterval = null;
+    toast('GPIO live refresh OFF', 'warning');
+  }
+});
+
 async function readGpioPin(pin) {
   try {
     const p = pin !== undefined ? pin : parseInt($('gpio-pin-sel').value);
@@ -548,8 +590,9 @@ async function readGpioPin(pin) {
 $('btn-gpio-read').addEventListener('click', () => readGpioPin());
 
 $('gpio-mode-sel').addEventListener('change', () => {
-  const valField = $('gpio-value-field');
-  valField.style.display = $('gpio-mode-sel').value === 'output' ? '' : 'none';
+  const isOutput = $('gpio-mode-sel').value === 'output';
+  $('gpio-value-field').style.display = isOutput ? '' : 'none';
+  $('gpio-pwm-row').classList.toggle('hidden', !isOutput);
 });
 
 $('btn-gpio-set').addEventListener('click', async () => {
@@ -625,10 +668,13 @@ $('blink-inc').addEventListener('click', () => {
 });
 
 $('btn-blink').addEventListener('click', async () => {
+  const pin = $('gpio-blink-pin-sel').value;
+  const times = state.blinkCount;
+  const body = new URLSearchParams({ pin, times }).toString();
   try {
-    const data = await apiFetch(`/api/led/blink?times=${state.blinkCount}`, { auth: true });
-    showResult('blink-result', `Blinked ${data.blinked} times`, 'success');
-    toast(`LED blinked ×${data.blinked}`, 'success');
+    const data = await apiFetch('/api/gpio/blink', { method: 'POST', auth: true, body });
+    showResult('blink-result', `GPIO ${data.pin} blinked ${data.blinked} times`, 'success');
+    toast(`GPIO ${pin} blinked ×${data.blinked}`, 'success');
   } catch (err) {
     showResult('blink-result', `Error: ${err.message}`, 'error');
     toast('Blink failed', 'error');
@@ -685,34 +731,22 @@ $('btn-analog-read').addEventListener('click', async () => {
   }
 });
 
-$('pwm-slider').addEventListener('input', () => {
-  setText('pwm-value-display', $('pwm-slider').value);
+// ── PWM Slider in GPIO Control ────────────────────────────
+$('gpio-pwm-slider').addEventListener('input', () => {
+  setText('gpio-pwm-display', $('gpio-pwm-slider').value);
 });
 
-$('btn-pwm-write').addEventListener('click', async () => {
-  const pin = $('pwm-pin-sel').value;
-  const value = $('pwm-slider').value;
+$('btn-gpio-pwm-write').addEventListener('click', async () => {
+  const pin = $('gpio-pin-sel').value;
+  const value = $('gpio-pwm-slider').value;
   const body = new URLSearchParams({ pin, value }).toString();
   try {
     const data = await apiFetch('/api/gpio/analog/write', { method: 'POST', auth: true, body });
-    showResult('analog-result', `PWM GPIO ${data.pin}: ${data.value} (pwm=${data.pwm})`, 'success');
-    toast(`PWM GPIO ${data.pin} = ${data.value}`, 'success');
+    showResult('gpio-result', `PWM GPIO ${data.pin}: ${data.value}`, 'success');
+    toast(`PWM GPIO ${pin} = ${data.value}`, 'success');
   } catch (err) {
-    showResult('analog-result', `Error: ${err.message}`, 'error');
+    showResult('gpio-result', `Error: ${err.message}`, 'error');
     toast('PWM write failed', 'error');
-  }
-});
-
-$('btn-pwm-pin-save').addEventListener('click', async () => {
-  const pin = $('pwm-pin-sel').value;
-  const body = new URLSearchParams({ pin }).toString();
-  try {
-    const data = await apiFetch('/api/pwm/pin', { method: 'POST', auth: true, body });
-    showResult('analog-result', `PWM default pin saved: GPIO ${data.pwm_pin}`, 'success');
-    toast(`PWM pin set to GPIO ${data.pwm_pin}`, 'success');
-  } catch (err) {
-    showResult('analog-result', `Error: ${err.message}`, 'error');
-    toast('PWM pin save failed', 'error');
   }
 });
 
@@ -1085,7 +1119,7 @@ async function loadNetworkTab() {
     if (info.static_ip) $('ip-addr').value = info.static_ip;
     if (info.static_gateway) $('ip-gateway').value = info.static_gateway;
     if (info.static_subnet) $('ip-subnet').value = info.static_subnet;
-    if (info.pwm_pin != null) $('pwm-pin-sel').value = info.pwm_pin;
+
   } catch {}
 }
 

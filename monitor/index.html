@@ -210,6 +210,18 @@
               </div>
             </div>
           </div>
+
+          <div class="card" id="connectivity-card">
+            <div class="card-header">
+              <span class="card-icon">⌁</span>
+              <span class="card-title">CONNECTIVITY</span>
+              <button class="card-action-btn" id="btn-conn-check">CHECK</button>
+            </div>
+            <div class="info-grid">
+              <div class="info-item"><span class="info-label">GATEWAY</span><span class="info-val" id="conn-gateway">—</span></div>
+              <div class="info-item"><span class="info-label">INTERNET (8.8.8.8)</span><span class="info-val" id="conn-internet">—</span></div>
+            </div>
+          </div>
         </div>
 
       </section>
@@ -334,23 +346,6 @@
 
       <div class="card">
         <div class="card-header">
-          <span class="card-icon">◌</span>
-          <span class="card-title">BLINK</span>
-        </div>
-        <div class="blink-form">
-          <label class="field-label">BLINK COUNT</label>
-          <div class="blink-counter">
-            <button class="counter-btn" id="blink-dec">−</button>
-            <span class="counter-val" id="blink-count">5</span>
-            <button class="counter-btn" id="blink-inc">+</button>
-          </div>
-          <button class="btn-action btn-primary" id="btn-blink">BLINK</button>
-          <div class="action-result hidden" id="blink-result"></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
           <span class="card-icon">⊕</span>
           <span class="card-title">CHANGE PIN</span>
         </div>
@@ -378,10 +373,21 @@
   <!-- GPIO -->
   <section class="tab-pane" id="tab-gpio">
     <div class="cards-grid">
+
       <div class="card card--wide">
         <div class="card-header">
           <span class="card-icon">⊞</span>
           <span class="card-title">GPIO PINS</span>
+          <div class="gpio-live-controls">
+            <label class="toggle-label">
+              <span class="toggle-text">LIVE</span>
+              <span class="toggle-switch" id="gpio-live-toggle">
+                <span class="toggle-slider"></span>
+              </span>
+            </label>
+            <input type="number" class="field-input inline-input" id="gpio-live-interval" placeholder="5" min="1" style="width:50px;padding:0.3rem;font-size:0.65rem" />
+            <span style="font-size:0.6rem;color:var(--text-dim)">s</span>
+          </div>
           <button class="card-action-btn" id="btn-gpio-refresh">REFRESH</button>
         </div>
         <div class="gpio-grid" id="gpio-grid">
@@ -425,20 +431,65 @@
               </select>
             </div>
           </div>
+          <div class="form-row hidden" id="gpio-pwm-row">
+            <div class="form-field">
+              <label class="field-label">PWM VALUE 0-100</label>
+              <div style="display:flex;align-items:center;gap:0.5rem">
+                <input type="range" class="field-slider" id="gpio-pwm-slider" min="0" max="100" value="0" style="flex:1" />
+                <span class="slider-value" id="gpio-pwm-display" style="font-size:0.9rem">0</span>
+              </div>
+            </div>
+          </div>
           <div class="form-row">
             <button class="btn-action btn-primary" id="btn-gpio-set">SET PIN</button>
             <button class="btn-action btn-secondary" id="btn-gpio-read">READ PIN</button>
             <button class="btn-action btn-primary" id="btn-gpio-pulse">PULSE 500ms</button>
             <button class="btn-action btn-primary" id="btn-gpio-toggle">TOGGLE</button>
+            <button class="btn-action btn-primary" id="btn-gpio-pwm-write">WRITE PWM</button>
           </div>
           <div class="action-result hidden" id="gpio-result"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-icon">◌</span>
+          <span class="card-title">BLINK</span>
+        </div>
+        <div class="action-block">
+          <div class="form-row">
+            <div class="form-field">
+              <label class="field-label">PIN</label>
+              <select class="field-select" id="gpio-blink-pin-sel">
+                <option value="0">GPIO 0</option>
+                <option value="2" selected>GPIO 2</option>
+                <option value="4">GPIO 4</option>
+                <option value="5">GPIO 5</option>
+                <option value="12">GPIO 12</option>
+                <option value="13">GPIO 13</option>
+                <option value="14">GPIO 14</option>
+                <option value="15">GPIO 15</option>
+                <option value="16">GPIO 16</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label class="field-label">COUNT</label>
+              <div class="blink-counter">
+                <button class="counter-btn" id="blink-dec" type="button">−</button>
+                <span class="counter-val" id="blink-count">5</span>
+                <button class="counter-btn" id="blink-inc" type="button">+</button>
+              </div>
+            </div>
+          </div>
+          <button class="btn-action btn-primary" id="btn-blink">BLINK</button>
+          <div class="action-result hidden" id="blink-result"></div>
         </div>
       </div>
 
       <div class="card card--wide">
         <div class="card-header">
           <span class="card-icon">∿</span>
-          <span class="card-title">ANALOG</span>
+          <span class="card-title">ANALOG (A0)</span>
         </div>
         <div class="analog-grid">
           <div class="analog-read-block">
@@ -449,37 +500,10 @@
             </div>
             <button class="btn-action btn-secondary" id="btn-analog-read">READ A0</button>
           </div>
-          <div class="analog-write-block">
-            <label class="field-label">PWM OUTPUT</label>
-            <div class="form-row">
-              <div class="form-field">
-                <label class="field-label" style="font-size:0.55rem">PIN</label>
-                <select class="field-select" id="pwm-pin-sel">
-                  <option value="0">GPIO 0</option>
-                  <option value="2">GPIO 2</option>
-                  <option value="4">GPIO 4</option>
-                  <option value="5" selected>GPIO 5</option>
-                  <option value="12">GPIO 12</option>
-                  <option value="13">GPIO 13</option>
-                  <option value="14">GPIO 14</option>
-                  <option value="15">GPIO 15</option>
-                  <option value="16">GPIO 16</option>
-                </select>
-              </div>
-              <div class="form-field">
-                <label class="field-label" style="font-size:0.55rem">VALUE 0-100</label>
-                <input type="range" class="field-slider" id="pwm-slider" min="0" max="100" value="0" />
-                <span class="slider-value" id="pwm-value-display">0</span>
-              </div>
-            </div>
-            <div class="form-row">
-              <button class="btn-action btn-primary" id="btn-pwm-write">WRITE PWM</button>
-              <button class="btn-action btn-secondary" id="btn-pwm-pin-save">SAVE PWM PIN</button>
-            </div>
-            <div class="action-result hidden" id="analog-result"></div>
-          </div>
         </div>
+        <div class="action-result hidden" id="analog-result"></div>
       </div>
+
     </div>
   </section>
 

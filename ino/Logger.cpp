@@ -16,6 +16,12 @@ void logAdd(unsigned long ms, String msg) {
   if (logCount < LOG_BUFFER_SIZE) logCount++;
 }
 
+void logPrint(const String& tag, const String& msg) {
+  String line = "[" + tag + "] " + msg;
+  Serial.println(line);
+  logAdd(millis(), line);
+}
+
 String escapeJson(const String& s) {
   String out = "";
   for (size_t i = 0; i < s.length(); i++) {

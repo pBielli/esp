@@ -124,6 +124,7 @@ void setupRoutes() {
     a.add("/api/ddns/refresh-ip?idx=N");
     a.add("/api/gpio/pulse (POST: pin,ms)");
     a.add("/api/gpio/toggle (POST: pin)");
+    a.add("/api/gpio/blink (POST: pin,times)");
     String r; serializeJson(doc, r);
     server.send(200, "application/json", r);
   });
@@ -698,6 +699,14 @@ void setupRoutes() {
     server.send(200, "application/json", gpioToggle(pin));
   });
 
+  addOptions("/api/gpio/blink");
+  server.on("/api/gpio/blink", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    int pin = server.arg("pin").toInt();
+    int times = server.arg("times").toInt();
+    server.send(200, "application/json", gpioBlink(pin, times));
+  });
+
   server.begin();
-  Serial.println("HTTP server started");
+  logPrint("HTTP", "server started");
 }

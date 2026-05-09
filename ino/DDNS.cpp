@@ -46,8 +46,7 @@ String getPublicIP() {
     http.end();
     if (ip != "") return ip;
 
-    Serial.println("getPublicIP: " + host + " failed (code=" + String(code) + "), trying next...");
-    logAdd(millis(), "Public IP server failed: " + host);
+    logPrint("DDNS", "Public IP server failed: " + host + " (code=" + String(code) + "), trying next...");
   }
   return "";
 }
@@ -122,16 +121,13 @@ String updateDDNS(String ip) {
 
   if (code == HTTP_CODE_OK) {
     if(resp.indexOf("KO") == -1){
-      logAdd(millis(), "DDNS updated: " + resp);
-      Serial.println("DDNS: " + resp);
+      logPrint("DDNS", "Updated: " + resp);
     } else {
-      logAdd(millis(), "DDNS update failed: " + resp);
-      Serial.println("DDNS update failed: " + resp);
+      logPrint("DDNS", "Update failed: " + resp);
     }
   } else {
     resp = "KO_HTTP:" + String(code);
-    logAdd(millis(), "DDNS HTTP failed: " + resp);
-    Serial.println("DDNS HTTP failed: " + resp);
+    logPrint("DDNS", "HTTP failed: " + resp);
   }
   http.end();
   return resp;
@@ -145,18 +141,15 @@ bool checkDDNS() {
   bool flag=false;
   if (ddns != "" && pub != "") {
     if (ddns != pub) {
-      Serial.println("Mismatch! Updating...");
-      logAdd(millis(), "DDNS mismatch detected");
+      logPrint("DDNS", "Mismatch detected: DDNS=" + ddns + " Public=" + pub + " - Updating...");
       ledBlink(5);
       ledOn();
     } else {
-      Serial.println("Match");
+      logPrint("DDNS", "Match OK: " + ddns);
       ledOff();
       flag=true;
     }
   }
-  Serial.println("Check DDNS:"+ String(cfg.ddns_hostname) + " - DDNS=" + ddns + " Public=" + pub + "Match=" + (flag?"True":"False"));
-  logAdd(millis(), "Check DDNS:"+ String(cfg.ddns_hostname) + " - DDNS=" + ddns + " Public=" + pub + "Match=" + (flag?"True":"False"));
   return flag;
 }
 bool checkAndUpdateDDNS() {
@@ -164,8 +157,7 @@ bool checkAndUpdateDDNS() {
   if (!flag) {
     String resp = updateDDNS(_cachedPublicIP);
     flag=resp.indexOf("KO") == -1;
-    Serial.println("Update DDNS:"+ String(cfg.ddns_hostname) + " - Match:" + (flag ? "True" : "False")+" - Resp: " + resp );
-    logAdd(millis(), "Update DDNS:"+ String(cfg.ddns_hostname) + " - Match:" + (flag ? "True" : "False")+" - Resp: " + resp );
+    logPrint("DDNS", "Update " + String(cfg.ddns_hostname) + " - Match:" + (flag ? "True" : "False") + " - Resp: " + resp);
   }
   return flag;
 }
