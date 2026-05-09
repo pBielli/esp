@@ -382,9 +382,9 @@ body {
 /* Cards */
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 1rem;
-  align-items: start;
+  grid-auto-rows: 1fr;
 }
 
 .card {
@@ -650,14 +650,22 @@ body {
 
 .gpio-pin-num {
   font-family: var(--font-display);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 700;
   color: var(--green);
   display: block;
 }
 
+.gpio-pin-label {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  display: block;
+  line-height: 1;
+  margin-bottom: 0.15rem;
+}
+
 .gpio-pin-state {
-  font-size: 0.6rem;
+  font-size: 0.55rem;
   color: var(--text-dim);
   letter-spacing: 0.1em;
 }
@@ -1293,6 +1301,7 @@ body {
 
 /* Utilities */
 .hidden { display: none !important; }
+.dimmed { opacity: 0.35; transition: opacity 0.4s ease; }
 
 /* Scrollbar global */
 ::-webkit-scrollbar { width: 4px; height: 4px; }

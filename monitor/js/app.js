@@ -16,6 +16,11 @@ const state = {
   bootEpoch: null,
 };
 
+const ESP8266_PIN_LABELS = {
+  0: 'D3', 1: 'TX', 2: 'D4', 3: 'RX', 4: 'D2', 5: 'D1',
+  9: 'SD2', 10: 'SD3', 12: 'D6', 13: 'D7', 14: 'D5', 15: 'D8', 16: 'D0'
+};
+
 // ── Utils ──────────────────────────────────────────────────
 function encodeAuth(user, pass) {
   return 'Basic ' + btoa(`${user}:${pass}`);
@@ -178,6 +183,8 @@ function initDashboard(info) {
   const pill = $('status-pill');
   pill.classList.add('online');
   setText('status-text', 'ONLINE');
+  $('device-time').classList.remove('dimmed');
+  $('info-uptime').classList.remove('dimmed');
 
   updateInfoCard(info);
   loadGpioInfo();
@@ -198,11 +205,17 @@ async function refreshAll() {
     const info = await apiFetch('/api/info');
     updateInfoCard(info);
     loadTime();
+    $('status-pill').classList.add('online');
+    setText('status-text', 'ONLINE');
+    $('device-time').classList.remove('dimmed');
+    $('info-uptime').classList.remove('dimmed');
     toast('Refreshed', 'success', 1500);
   } catch {
     toast('Refresh failed', 'error');
     $('status-pill').classList.remove('online');
     setText('status-text', 'OFFLINE');
+    $('device-time').classList.add('dimmed');
+    $('info-uptime').classList.add('dimmed');
   }
 }
 
@@ -411,6 +424,8 @@ async function loadTime() {
 
 function tickClock() {
   if (!state.lastTimeSync || !state.deviceEpoch) return;
+  const pill = $('status-pill');
+  if (!pill.classList.contains('online')) return;
   const elapsed = Math.floor((Date.now() - state.lastTimeSync) / 1000);
   const current = state.deviceEpoch + elapsed;
   const { time, date } = formatTimeFromEpoch(current);
@@ -600,8 +615,9 @@ async function loadGpioInfo() {
       const div = document.createElement('div');
       const valueClass = p.available && p.value !== undefined ? (p.value === 1 ? 'high' : 'low') : '';
       div.className = `gpio-pin ${p.available ? 'available' : 'unavailable'} ${valueClass}`;
+      const label = ESP8266_PIN_LABELS[p.pin] || '';
       const stateText = p.available ? (p.value !== undefined ? `V: ${p.value}` : 'AVAIL') : 'N/A';
-      div.innerHTML = `<span class="gpio-pin-num">${p.pin}</span><span class="gpio-pin-state">${stateText}</span>`;
+      div.innerHTML = `<span class="gpio-pin-num">GPIO ${p.pin}</span>${label ? `<span class="gpio-pin-label">${label}</span>` : ''}<span class="gpio-pin-state">${stateText}</span>`;
       if (p.available) {
         div.title = `GPIO ${p.pin} — Click to read`;
         div.addEventListener('click', () => {
