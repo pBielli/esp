@@ -312,29 +312,42 @@ void setupRoutes() {
     http.setUserAgent("ESP-DDNS/1.0");
     WiFiClientSecure cSecure;
     WiFiClient cPlain;
-    if (url.startsWith("https://")) {
+    bool isHttps = url.startsWith("https://");
+    if (isHttps) {
       cSecure.setInsecure();
       http.begin(cSecure, url);
     } else {
       http.begin(cPlain, url);
     }
     code = http.GET();
-    if (code == HTTP_CODE_OK) {
+    auto readPayload = [&]() {
       WiFiClient *s = http.getStreamPtr();
-      if (s) {
-        int maxSize = 10240, total = 0;
-        unsigned long timeout = millis() + 5000;
-        while (millis() < timeout && total < maxSize) {
-          if (s->available()) {
-            payload += (char)s->read();
-            total++;
-            timeout = millis() + 5000;
-          }
+      if (!s) return;
+      int maxSize = 10240, total = 0;
+      unsigned long timeout = millis() + 5000;
+      while (millis() < timeout && total < maxSize) {
+        if (s->available()) {
+          payload += (char)s->read();
+          total++;
+          timeout = millis() + 5000;
         }
-        if (total >= maxSize) payload += "\n[TRUNCATED at 10KB]";
+      }
+      if (total >= maxSize) payload += "\n[TRUNCATED at 10KB]";
+    };
+    if (code == HTTP_CODE_OK) {
+      readPayload();
+    } else if (isHttps) {
+      http.end();
+      String httpUrl = "http://" + url.substring(8);
+      http.begin(cPlain, httpUrl);
+      code = http.GET();
+      if (code == HTTP_CODE_OK) {
+        readPayload();
+      } else {
+        payload = "Error (" + String(code) + "): " + http.errorToString(code);
       }
     } else {
-      payload = "Error: " + String(code);
+      payload = "Error (" + String(code) + "): " + http.errorToString(code);
     }
     http.end();
     server.send(200, "text/plain", payload);

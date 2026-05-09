@@ -21,37 +21,39 @@ String getCachedDDNSIP() { return _cachedDDNSIP; }
 
 String getPublicIP() {
   String urls = String(cfg.public_ip_urls);
-  HTTPClient http;
-  http.setTimeout(10000);
-  http.setUserAgent("ESP-DDNS/1.0");
   while (urls.length() > 0) {
     int comma = urls.indexOf(',');
     String host = (comma == -1) ? urls : urls.substring(0, comma);
     urls = (comma == -1) ? "" : urls.substring(comma + 1);
     host.trim();
     if (host == "") continue;
-    String url = "https://" + host;
-    WiFiClientSecure c;
-    c.setInsecure();
-    http.begin(c, url);
-    int code = http.GET();
-    String ip = (code == HTTP_CODE_OK) ? http.getString() : "";
+    HTTPClient http; http.setTimeout(10000); http.setUserAgent("ESP-DDNS/1.0");
+    String ip;
+    int code;
+
+    WiFiClientSecure cs;
+    cs.setInsecure();
+    http.begin(cs, "https://" + host);
+    code = http.GET();
+    if (code == HTTP_CODE_OK) { ip = http.getString(); ip.trim(); }
     http.end();
-    ip.trim();
-    if (ip != "") {
-      return ip;
-    }
-    Serial.println("getPublicIP: " + url + " failed (code=" + String(code) + "), trying next...");
-    logAdd(millis(), "Public IP server failed: " + url);
+    if (ip != "") return ip;
+
+    WiFiClient c;
+    http.begin(c, "http://" + host);
+    code = http.GET();
+    if (code == HTTP_CODE_OK) { ip = http.getString(); ip.trim(); }
+    http.end();
+    if (ip != "") return ip;
+
+    Serial.println("getPublicIP: " + host + " failed (code=" + String(code) + "), trying next...");
+    logAdd(millis(), "Public IP server failed: " + host);
   }
   return "";
 }
 
 String getPublicIP(int serverIdx) {
   String urls = String(cfg.public_ip_urls);
-  HTTPClient http;
-  http.setTimeout(10000);
-  http.setUserAgent("ESP-DDNS/1.0");
   int idx = 0;
   while (urls.length() > 0) {
     int comma = urls.indexOf(',');
@@ -60,14 +62,22 @@ String getPublicIP(int serverIdx) {
     host.trim();
     if (host == "") continue;
     if (idx == serverIdx) {
-      String url = "https://" + host;
-      WiFiClientSecure c;
-      c.setInsecure();
-      http.begin(c, url);
+      HTTPClient http; http.setTimeout(10000); http.setUserAgent("ESP-DDNS/1.0");
+      String ip;
+
+      WiFiClientSecure cs;
+      cs.setInsecure();
+      http.begin(cs, "https://" + host);
       int code = http.GET();
-      String ip = (code == HTTP_CODE_OK) ? http.getString() : "";
+      if (code == HTTP_CODE_OK) { ip = http.getString(); ip.trim(); }
       http.end();
-      ip.trim();
+      if (ip != "") return ip;
+
+      WiFiClient c;
+      http.begin(c, "http://" + host);
+      code = http.GET();
+      if (code == HTTP_CODE_OK) { ip = http.getString(); ip.trim(); }
+      http.end();
       return ip;
     }
     idx++;
@@ -83,22 +93,34 @@ String updateDDNS(String ip) {
   url.replace("$domain", String(cfg.ddns_domain));
   url.replace("$token", String(cfg.ddns_token));
   url.replace("$ip", ip);
+  String resp;
   int code;
+
   if (url.startsWith("https://")) {
     WiFiClientSecure c;
     c.setInsecure();
     http.begin(c, url);
     code = http.GET();
+    if (code == HTTP_CODE_OK) { resp = http.getString(); resp.trim(); }
+    http.end();
+
+    if (code != HTTP_CODE_OK) {
+      String httpUrl = url; httpUrl.replace("https://", "http://");
+      WiFiClient cPlain;
+      http.begin(cPlain, httpUrl);
+      code = http.GET();
+      if (code == HTTP_CODE_OK) { resp = http.getString(); resp.trim(); }
+      http.end();
+    }
   } else {
     WiFiClient c;
     http.begin(c, url);
     code = http.GET();
+    if (code == HTTP_CODE_OK) { resp = http.getString(); resp.trim(); }
+    http.end();
   }
-  String resp = "";
+
   if (code == HTTP_CODE_OK) {
-    resp = http.getString();
-    resp.trim();
-    //se risposta contiene "KO" allora c'è stato un errore, altrimenti è andato tutto bene
     if(resp.indexOf("KO") == -1){
       logAdd(millis(), "DDNS updated: " + resp);
       Serial.println("DDNS: " + resp);
@@ -106,6 +128,10 @@ String updateDDNS(String ip) {
       logAdd(millis(), "DDNS update failed: " + resp);
       Serial.println("DDNS update failed: " + resp);
     }
+  } else {
+    resp = "KO_HTTP:" + String(code);
+    logAdd(millis(), "DDNS HTTP failed: " + resp);
+    Serial.println("DDNS HTTP failed: " + resp);
   }
   http.end();
   return resp;
