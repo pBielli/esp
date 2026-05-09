@@ -2,6 +2,7 @@
 #include "Config.h"
 #include "GPIO.h"
 #include "Logger.h"
+#include <ArduinoJson.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <WiFiClient.h>
