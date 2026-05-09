@@ -697,27 +697,7 @@ $('btn-gpio-toggle').addEventListener('click', async () => {
   }
 });
 
-// ── LED Tab ────────────────────────────────────────────────
-async function setLedState(state_) {
-  try {
-    const data = await apiFetch(`/api/led/${state_}`, { auth: true });
-    const bulb = $('led-bulb');
-    const label = $('led-state-label');
-    const isOn = data.state === 'on';
-    bulb.className = `led-bulb ${isOn ? 'on' : 'off'}`;
-    label.className = `led-label ${isOn ? 'on' : 'off'}`;
-    setText('led-state-label', isOn ? 'ON' : 'OFF');
-    setText('led-pin-display', data.led_pin !== undefined ? data.led_pin : '—');
-    toast(`LED turned ${data.state}`, 'success');
-  } catch (err) {
-    toast(`LED error: ${err.message}`, 'error');
-  }
-}
-
-$('btn-led-on').addEventListener('click',  () => setLedState('on'));
-$('btn-led-off').addEventListener('click', () => setLedState('off'));
-
-// Blink counter
+// ── Blink counter ──────────────────────────────────────────
 $('blink-dec').addEventListener('click', () => {
   if (state.blinkCount > 1) setText('blink-count', --state.blinkCount);
 });
@@ -1053,6 +1033,23 @@ $('btn-curl').addEventListener('click', async () => {
 let _apiEndpoints = [];
 let _selectedEp = null;
 
+const API_GROUPS = ['GENERAL','DDNS','GPIO','LED','SYSTEM','CONFIG','SETTINGS','NTP','WIFI','DNS','IP','PWM'];
+
+function getApiGroup(path) {
+  if (path.startsWith('/api/ddns/')) return 'DDNS';
+  if (path.startsWith('/api/gpio/')) return 'GPIO';
+  if (path.startsWith('/api/led/')) return 'LED';
+  if (path.startsWith('/api/system/')) return 'SYSTEM';
+  if (path.startsWith('/api/config/')) return 'CONFIG';
+  if (path.startsWith('/api/set/')) return 'SETTINGS';
+  if (path.startsWith('/api/ntp/')) return 'NTP';
+  if (path.startsWith('/api/wifi/')) return 'WIFI';
+  if (path.startsWith('/api/dns/')) return 'DNS';
+  if (path.startsWith('/api/ip/')) return 'IP';
+  if (path.startsWith('/api/pwm/')) return 'PWM';
+  return 'GENERAL';
+}
+
 $('btn-api-refresh').addEventListener('click', loadApiExplorer);
 
 async function loadApiExplorer() {
@@ -1067,15 +1064,38 @@ async function loadApiExplorer() {
       list.innerHTML = '<div style="color:var(--text-dim);font-size:0.75rem">No endpoints returned.</div>';
       return;
     }
-    list.innerHTML = '';
+    // Group by path prefix
+    const grouped = {};
     for (const ep of _apiEndpoints) {
-      const item = document.createElement('div');
-      item.className = 'api-list-item';
-      item.dataset.index = _apiEndpoints.indexOf(ep);
-      const isPost = ep.method === 'POST';
-      item.innerHTML = `<span class="api-tester-method">${isPost ? 'POST' : 'GET'}</span><span class="api-tester-path">${ep.path}</span>`;
-      item.addEventListener('click', () => selectApiEndpoint(parseInt(item.dataset.index)));
-      list.appendChild(item);
+      const grp = getApiGroup(ep.path);
+      if (!grouped[grp]) grouped[grp] = [];
+      grouped[grp].push(ep);
+    }
+    list.innerHTML = '';
+    let flatIdx = 0;
+    for (const grp of API_GROUPS) {
+      const eps = grouped[grp];
+      if (!eps || !eps.length) continue;
+      const header = document.createElement('div');
+      header.className = 'api-group-header';
+      header.textContent = grp;
+      list.appendChild(header);
+      for (const ep of eps) {
+        const item = document.createElement('div');
+        item.className = 'api-list-item';
+        item.dataset.index = flatIdx;
+        const isPost = ep.method === 'POST';
+        item.innerHTML = `<span class="api-tester-method">${isPost ? 'POST' : 'GET'}</span><span class="api-tester-path">${ep.path}</span>`;
+        item.addEventListener('click', () => selectApiEndpoint(parseInt(item.dataset.index)));
+        list.appendChild(item);
+        flatIdx++;
+      }
+    }
+    // Rebuild flat array in grouped order
+    _apiEndpoints = [];
+    for (const grp of API_GROUPS) {
+      const eps = grouped[grp];
+      if (eps) _apiEndpoints.push(...eps);
     }
     selectApiEndpoint(0);
     toast(`${_apiEndpoints.length} endpoints loaded`, 'success');

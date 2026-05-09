@@ -110,8 +110,6 @@ void setupRoutes() {
     add("/api/gpio/set",          "POST", true,  {"pin","mode","value"});
     add("/api/led/pin",           "POST", true,  {"pin"});
     add("/api/gpio/invert",       "POST", true,  {"enabled"});
-    add("/api/led/on",            "POST", true,  {});
-    add("/api/led/off",           "POST", true,  {});
     add("/api/ddns/check",        "GET",  false, {});
     add("/api/ntp/set",           "POST", true,  {"server","tz_offset"});
     add("/api/wifi/scan",         "GET",  true,  {});
@@ -429,28 +427,6 @@ void setupRoutes() {
     cfg.gpio_invert = (enabled == "1" || enabled == "true") ? 1 : 0;
     storageSave();
     server.send(200, "application/json", "{\"status\":\"saved\",\"gpio_invert\":" + String(cfg.gpio_invert) + "}");
-  });
-
-  addOptions("/api/led/on");
-  server.on("/api/led/on", []() {
-    if (!checkAuth()) return;
-    ledOn();
-    JsonDocument doc;
-    doc["led_pin"] = cfg.led_pin;
-    doc["state"] = "on";
-    String r; serializeJson(doc, r);
-    server.send(200, "application/json", r);
-  });
-
-  addOptions("/api/led/off");
-  server.on("/api/led/off", []() {
-    if (!checkAuth()) return;
-    ledOff();
-    JsonDocument doc;
-    doc["led_pin"] = cfg.led_pin;
-    doc["state"] = "off";
-    String r; serializeJson(doc, r);
-    server.send(200, "application/json", r);
   });
 
   addOptions("/api/set/ssid");
