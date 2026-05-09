@@ -388,8 +388,20 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (btn.dataset.tab === 'log') loadLog();
     if (btn.dataset.tab === 'ddns') { loadDdnsConfig(); loadLedInvert(); }
     if (btn.dataset.tab === 'network') loadNetworkTab();
-    if (btn.dataset.tab === 'system') loadSystemTab();
+    if (btn.dataset.tab === 'api') loadApiExplorer();
   });
+});
+
+// ── Sub-Tab Navigation ────────────────────────────────────
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.sub-tab-btn');
+  if (btn) {
+    document.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.sub-tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    const pane = document.getElementById(`subtab-${btn.dataset.subtab}`);
+    if (pane) pane.classList.add('active');
+  }
 });
 
 // ── DDNS Tab ───────────────────────────────────────────────
@@ -420,12 +432,12 @@ async function loadDdnsConfig() {
     if (info.ddns_upd_url) $('ddns-upd-url').value = info.ddns_upd_url;
     if (info.ddns_check_interval != null) $('ddns-interval').value = info.ddns_check_interval;
     if (info.public_ip_urls) {
-      const parts = info.public_ip_urls.split(',');
-      $('ddns-ipurl-1').value = parts[0] || '';
-      $('ddns-ipurl-2').value = parts[1] || '';
+      $('ddns-ipurls').value = info.public_ip_urls;
       const sel = $('ipcheck-server');
-      sel.options[0] = new Option(parts[0] || 'Server 1', 0);
-      sel.options[1] = new Option(parts[1] || 'Server 2', 1);
+      sel.innerHTML = '';
+      info.public_ip_urls.split(',').forEach((url, i) => {
+        sel.options[i] = new Option(url || `Server ${i+1}`, i);
+      });
     }
   } catch {}
 }
@@ -453,19 +465,17 @@ $('btn-ddns-config-save').addEventListener('click', async () => {
 
 // ── DDNS IP URLs ──────────────────────────────────────────
 $('btn-ddns-ipurls-save').addEventListener('click', async () => {
-  const s1 = $('ddns-ipurl-1').value.trim();
-  const s2 = $('ddns-ipurl-2').value.trim();
-  if (!s1 && !s2) { toast('Enter at least one server', 'warning'); return; }
-  const urls = s2 ? s1 + ',' + s2 : s1;
+  const urls = $('ddns-ipurls').value.trim();
+  if (!urls) { toast('Enter at least one server URL', 'warning'); return; }
   const body = new URLSearchParams({ urls }).toString();
   try {
     const data = await apiFetch('/api/ddns/ipurls', { method: 'POST', auth: true, body });
-    const parts = data.public_ip_urls.split(',');
-    $('ddns-ipurl-1').value = parts[0] || '';
-    $('ddns-ipurl-2').value = parts[1] || '';
+    $('ddns-ipurls').value = data.public_ip_urls;
     const sel = $('ipcheck-server');
-    sel.options[0] = new Option(parts[0] || 'Server 1', 0);
-    sel.options[1] = new Option(parts[1] || 'Server 2', 1);
+    sel.innerHTML = '';
+    (data.public_ip_urls || '').split(',').forEach((url, i) => {
+      sel.options[i] = new Option(url || `Server ${i+1}`, i);
+    });
     showResult('ddns-ipurls-result', `IP URLs saved: ${data.public_ip_urls}`, 'success');
     toast('IP URLs saved', 'success');
   } catch (err) {
@@ -668,15 +678,15 @@ $('blink-inc').addEventListener('click', () => {
 });
 
 $('btn-blink').addEventListener('click', async () => {
-  const pin = $('gpio-blink-pin-sel').value;
+  const pin = $('gpio-pin-sel').value;
   const times = state.blinkCount;
   const body = new URLSearchParams({ pin, times }).toString();
   try {
     const data = await apiFetch('/api/gpio/blink', { method: 'POST', auth: true, body });
-    showResult('blink-result', `GPIO ${data.pin} blinked ${data.blinked} times`, 'success');
+    showResult('gpio-result', `GPIO ${data.pin} blinked ${data.blinked} times`, 'success');
     toast(`GPIO ${pin} blinked ×${data.blinked}`, 'success');
   } catch (err) {
-    showResult('blink-result', `Error: ${err.message}`, 'error');
+    showResult('gpio-result', `Error: ${err.message}`, 'error');
     toast('Blink failed', 'error');
   }
 });
@@ -976,30 +986,114 @@ $('btn-curl').addEventListener('click', async () => {
   }
 });
 
-$('btn-api-help').addEventListener('click', async () => {
-  const list = $('api-list');
-  list.innerHTML = '<div style="color:var(--text-dim);font-size:.75rem">Loading…</div>';
-  list.classList.remove('hidden');
+// ── API Explorer ─────────────────────────────────────────
+$('btn-api-refresh').addEventListener('click', loadApiExplorer);
 
+async function loadApiExplorer() {
+  const container = $('api-endpoints-list');
+  container.innerHTML = '<div class="gpio-loading">Loading endpoints…</div>';
   try {
     const data = await apiFetch('/api/help');
     const endpoints = data.endpoints || [];
-    list.innerHTML = '';
-    for (const ep of endpoints) {
-      const div = document.createElement('div');
-      div.className = 'api-endpoint';
-      const isPost = ep.toString().includes('POST') || ep.method === 'POST';
-      const path = typeof ep === 'string' ? ep : ep.path || ep;
-      div.innerHTML = `<span class="api-method">${isPost ? 'POST' : 'GET'}</span><span>${path}</span>`;
-      list.appendChild(div);
+    if (!endpoints.length) {
+      container.innerHTML = '<div style="color:var(--text-dim);font-size:0.75rem">No endpoints returned.</div>';
+      return;
     }
-    if (!endpoints.length) list.innerHTML = '<div style="color:var(--text-dim);font-size:.75rem">No endpoints returned.</div>';
+    container.innerHTML = '';
+    for (const ep of endpoints) {
+      const card = document.createElement('div');
+      card.className = 'api-tester';
+      const isPost = ep.method === 'POST';
+      const path = ep.path || '';
+      const params = ep.params || [];
+
+      let inputsHtml = '';
+      if (params.length) {
+        inputsHtml = '<div class="api-tester-inputs">';
+        for (const p of params) {
+          inputsHtml += `<div class="api-tester-input-row"><label class="field-label">${p}</label><input type="text" class="field-input" data-param="${p}" placeholder="${p}" /></div>`;
+        }
+        inputsHtml += '</div>';
+      }
+
+      card.innerHTML = `
+        <div class="api-tester-header">
+          <span class="api-tester-method">${isPost ? 'POST' : 'GET'}</span>
+          <span class="api-tester-path">${path}</span>
+        </div>
+        ${inputsHtml}
+        <div class="api-tester-actions">
+          <button class="btn-action btn-primary" style="font-size:0.65rem;padding:0.35rem 0.7rem">CALL</button>
+          <label class="api-tester-auth-toggle">
+            <input type="checkbox" ${ep.auth ? 'checked' : ''} data-auth />
+            <span>AUTH</span>
+          </label>
+        </div>
+        <div class="api-response hidden">
+          <button class="api-copy-btn">COPY</button>
+          <pre class="api-response-body" style="margin:0;font-family:inherit;white-space:pre-wrap"></pre>
+        </div>`;
+
+      const callBtn = card.querySelector('.btn-primary');
+      const authCb = card.querySelector('[data-auth]');
+      const respDiv = card.querySelector('.api-response');
+      const respBody = card.querySelector('.api-response-body');
+      const copyBtn = card.querySelector('.api-copy-btn');
+
+      callBtn.addEventListener('click', async () => {
+        callBtn.disabled = true;
+        callBtn.textContent = '⟳';
+        respDiv.classList.remove('hidden');
+        respBody.textContent = 'Calling...';
+        try {
+          const paramInputs = card.querySelectorAll('[data-param]');
+          const urlParams = new URLSearchParams();
+          const bodyParams = new URLSearchParams();
+          paramInputs.forEach(inp => {
+            if (inp.value.trim()) {
+              if (isPost) bodyParams.append(inp.dataset.param, inp.value.trim());
+              else urlParams.append(inp.dataset.param, inp.value.trim());
+            }
+          });
+          const qs = urlParams.toString();
+          const fullPath = qs ? path + '?' + qs : path;
+          const opts = { auth: authCb.checked };
+          if (isPost && bodyParams.toString()) {
+            opts.method = 'POST';
+            opts.body = bodyParams.toString();
+          }
+          const result = await apiFetch(fullPath, opts);
+          respBody.textContent = typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result);
+        } catch (err) {
+          respBody.textContent = `Error: ${err.message}`;
+        } finally {
+          callBtn.disabled = false;
+          callBtn.textContent = 'CALL';
+        }
+      });
+
+      copyBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(respBody.textContent).then(() => {
+          toast('Response copied', 'success', 1000);
+        }).catch(() => {
+          const ta = document.createElement('textarea');
+          ta.value = respBody.textContent;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          ta.remove();
+          toast('Response copied', 'success', 1000);
+        });
+      });
+
+      container.appendChild(card);
+    }
     toast(`${endpoints.length} endpoints loaded`, 'success');
   } catch (err) {
-    list.innerHTML = `<div style="color:var(--red);font-size:.75rem">Error: ${err.message}</div>`;
-    toast('API help failed', 'error');
+    container.innerHTML = `<div style="color:var(--red);font-size:0.75rem">Failed: ${err.message}</div>`;
+    toast('API load failed', 'error');
   }
-});
+}
 
 // ── Config Export/Import ──────────────────────────────────
 $('btn-config-export').addEventListener('click', async () => {
@@ -1037,15 +1131,7 @@ $('btn-config-import').addEventListener('change', async (e) => {
 
 // ── System Tab ────────────────────────────────────────────
 async function loadSystemTab() {
-  try {
-    const [ver, info] = await Promise.all([
-      apiFetch('/api/system/version', { auth: true }),
-      apiFetch('/api/info')
-    ]);
-    setText('sys-version', ver.version || '—');
-    setText('sys-build',   ver.build_date || '—');
-    if (info.mdns) $('mdns-name').value = info.mdns;
-  } catch {}
+  // No dynamic data to load — CONFIG BACKUP is self-contained
 }
 
 $('btn-reboot').addEventListener('click', async () => {
