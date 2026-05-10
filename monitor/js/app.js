@@ -344,7 +344,7 @@ $('btn-ddns-check').addEventListener('click', async () => {
   setText('ddns-domain-ip', '⟳');
   setText('ddns-public-ip', '⟳');
   try {
-    const data = await apiFetch('/api/ddns/check');
+    const data = await apiFetch('/api/ddns/check', { method: 'POST', auth: true });
     setText('ddns-domain-ip', data.ddns_ip || '—');
     setText('ddns-public-ip', data.public_ip || '—');
     const ind = $('ddns-indicator');

@@ -25,6 +25,7 @@ String getCachedPublicIP() { return _cachedPublicIP; }
 String getCachedDDNSIP() { return _cachedDDNSIP; }
 
 String getPublicIP() {
+  if (ESP.getFreeHeap() < 4096) { delay(100); yield(); }
   String urls = String(cfg.public_ip_urls);
   while (urls.length() > 0) {
     int comma = urls.indexOf(',');
@@ -41,6 +42,7 @@ String getPublicIP() {
     http.begin(cs, "https://" + host);
     code = http.GET();
     if (code == HTTP_CODE_OK) { ip = http.getString(); ip.trim(); }
+    cs.stop();
     http.end();
     if (ip != "") return ip;
 
@@ -48,6 +50,7 @@ String getPublicIP() {
     http.begin(c, "http://" + host);
     code = http.GET();
     if (code == HTTP_CODE_OK) { ip = http.getString(); ip.trim(); }
+    c.stop();
     http.end();
     if (ip != "") return ip;
 
@@ -57,6 +60,7 @@ String getPublicIP() {
 }
 
 String getPublicIP(int serverIdx) {
+  if (ESP.getFreeHeap() < 4096) { delay(100); yield(); }
   String urls = String(cfg.public_ip_urls);
   int idx = 0;
   while (urls.length() > 0) {
@@ -74,6 +78,7 @@ String getPublicIP(int serverIdx) {
       http.begin(cs, "https://" + host);
       int code = http.GET();
       if (code == HTTP_CODE_OK) { ip = http.getString(); ip.trim(); }
+      cs.stop();
       http.end();
       if (ip != "") return ip;
 
@@ -81,6 +86,7 @@ String getPublicIP(int serverIdx) {
       http.begin(c, "http://" + host);
       code = http.GET();
       if (code == HTTP_CODE_OK) { ip = http.getString(); ip.trim(); }
+      c.stop();
       http.end();
       return ip;
     }
@@ -106,6 +112,7 @@ String updateDDNS(String ip) {
     http.begin(c, url);
     code = http.GET();
     if (code == HTTP_CODE_OK) { resp = http.getString(); resp.trim(); }
+    c.stop();
     http.end();
 
     if (code != HTTP_CODE_OK) {
@@ -114,6 +121,7 @@ String updateDDNS(String ip) {
       http.begin(cPlain, httpUrl);
       code = http.GET();
       if (code == HTTP_CODE_OK) { resp = http.getString(); resp.trim(); }
+      cPlain.stop();
       http.end();
     }
   } else {
@@ -121,6 +129,7 @@ String updateDDNS(String ip) {
     http.begin(c, url);
     code = http.GET();
     if (code == HTTP_CODE_OK) { resp = http.getString(); resp.trim(); }
+    c.stop();
     http.end();
   }
 
@@ -134,7 +143,6 @@ String updateDDNS(String ip) {
     resp = "KO_HTTP:" + String(code);
     logPrint("DDNS", "HTTP failed: " + resp);
   }
-  http.end();
   return resp;
 }
 

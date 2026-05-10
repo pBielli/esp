@@ -95,7 +95,7 @@ void setupRoutes() {
   addOptions("/api/help");
   server.on("/api/help", []() {
     sendCORS();
-    DynamicJsonDocument doc(8192);
+    DynamicJsonDocument doc(2048);
     JsonArray a = doc["endpoints"].to<JsonArray>();
     auto add = [&](const char* path, const char* method, bool auth, std::initializer_list<const char*> params) {
       JsonObject o = a.add<JsonObject>();
@@ -154,23 +154,18 @@ void setupRoutes() {
     add("/api/http/fetch",          "POST", true,  {"url"});
     add("/api/config/export",       "GET",  true,  {});
     add("/api/config/import",       "POST", true,  {"config"});
-    // ── Legacy endpoints (deprecated) ──
     add("/api/info",                "GET",  false, {});
-    add("/api/ddns/update",         "POST", true,  {});
-    add("/api/ddns/config",         "POST", true,  {"hostname","domain","token","upd_url"});
-    add("/api/gpio/info",           "GET",  false, {});
-    add("/api/gpio/read",           "GET",  false, {"pin"});
-    add("/api/gpio/analog/write",   "POST", true,  {"pin","value"});
-    add("/api/gpio/set",            "POST", true,  {"pin","mode","value"});
-    add("/api/ddns/check",          "GET",  false, {});
-    add("/api/system/reboot",       "POST", true,  {});
-    add("/api/system/factory-reset","POST", true,  {});
-    add("/api/config/export",       "GET",  true,  {});
-    add("/api/config/import",       "POST", true,  {"config"});
-    add("/api/ddns/interval",       "POST", true,  {"interval"});
-    add("/api/gpio/pulse",          "POST", true,  {"pin","ms"});
-    add("/api/gpio/toggle",         "POST", true,  {"pin"});
-    add("/api/gpio/blink",          "POST", true,  {"pin","times","ms"});
+    add("/api/system/version",      "GET",  false, {});
+    add("/api/system/ota",          "GET",  false, {});
+    add("/api/system/ota",          "POST", true,  {"url","interval"});
+    add("/api/system/ota/check",    "POST", true,  {});
+    add("/api/wifi/networks",       "GET",  true,  {});
+    add("/api/wifi/networks",       "POST", true,  {"ssid","password"});
+    add("/api/wifi/networks",       "DELETE",true, {"index"});
+    add("/api/wifi/networks/reorder","POST", true,  {"from","to"});
+    add("/api/wifi/connect",        "POST", true,  {"index"});
+    add("/api/wifi/ap",             "GET",  false, {});
+    add("/api/wifi/ap",             "POST", true,  {"enabled","ssid","password","ap_fallback"});
     String r; serializeJson(doc, r);
     server.send(200, "application/json", r);
   });
@@ -178,7 +173,7 @@ void setupRoutes() {
   addOptions("/api/info");
   server.on("/api/info", []() {
     sendCORS();
-    DynamicJsonDocument doc(2048);
+    DynamicJsonDocument doc(1024);
     doc["mac"] = WiFi.macAddress();
     doc["ssid"] = WiFi.SSID();
     doc["bssid"] = WiFi.BSSIDstr();
@@ -228,47 +223,6 @@ void setupRoutes() {
     server.send(200, "application/json", r);
   });
 
-  addOptions("/api/myip");
-  server.on("/api/myip", []() {
-    sendCORS();
-    String pub = getPublicIP();
-    if (pub != "") {
-      server.send(200, "application/json", "{\"public_ip\":\"" + pub + "\"}");
-    } else {
-      server.send(500, "application/json", "{\"error\":\"Unable to get public IP\"}");
-    }
-  });
-
-  addOptions("/api/time");
-  server.on("/api/time", []() {
-    sendCORS();
-    time_t epoch = ntpGetEpoch();
-    int tz_hours = cfg.tz_offset / 3600;
-    char utc_str[16];
-    snprintf(utc_str, sizeof(utc_str), "UTC%+dh", tz_hours);
-    DynamicJsonDocument doc(512);
-    doc["time"] = ntpGetTime();
-    doc["epoch"] = (long)epoch;
-    doc["tz_offset"] = cfg.tz_offset;
-    doc["utc"] = utc_str;
-    String r; serializeJson(doc, r);
-    server.send(200, "application/json", r);
-  });
-
-  addOptions("/api/log");
-  server.on("/api/log", []() {
-    if (!checkAuth()) return;
-    server.send(200, "application/json", logGet());
-  });
-
-  addOptions("/api/blink");
-  server.on("/api/blink", []() {
-    if (!checkAuth()) return;
-    int n = server.arg("times").toInt(); if (n < 1 || n > 100) n = 5;
-    ledBlink(n);
-    server.send(200, "application/json", "{\"blinked\":" + String(n) + "}");
-  });
-
   addOptions("/api/ddns/update");
   server.on("/api/ddns/update", []() {
     if (!checkAuth()) return;
@@ -284,314 +238,12 @@ void setupRoutes() {
     String domain = server.arg("domain");
     String token = server.arg("token");
     String upd_url = server.arg("upd_url");
-    if (hostname != "") strncpy(cfg.ddns_hostname, hostname.c_str(), sizeof(cfg.ddns_hostname) - 1);
-    if (domain != "") strncpy(cfg.ddns_domain, domain.c_str(), sizeof(cfg.ddns_domain) - 1);
-    if (token != "") strncpy(cfg.ddns_token, token.c_str(), sizeof(cfg.ddns_token) - 1);
-    if (upd_url != "") strncpy(cfg.ddns_upd_url, upd_url.c_str(), sizeof(cfg.ddns_upd_url) - 1);
+    if (hostname != "") strncpy(cfg.ddns_hostname, hostname.c_str(), sizeof(cfg.ddns_hostname) - 1); cfg.ddns_hostname[sizeof(cfg.ddns_hostname) - 1] = '\0';
+    if (domain != "") strncpy(cfg.ddns_domain, domain.c_str(), sizeof(cfg.ddns_domain) - 1); cfg.ddns_domain[sizeof(cfg.ddns_domain) - 1] = '\0';
+    if (token != "") strncpy(cfg.ddns_token, token.c_str(), sizeof(cfg.ddns_token) - 1); cfg.ddns_token[sizeof(cfg.ddns_token) - 1] = '\0';
+    if (upd_url != "") strncpy(cfg.ddns_upd_url, upd_url.c_str(), sizeof(cfg.ddns_upd_url) - 1); cfg.ddns_upd_url[sizeof(cfg.ddns_upd_url) - 1] = '\0';
     storageSave();
     server.send(200, "application/json", "{\"status\":\"saved\",\"ddns_hostname\":\"" + String(cfg.ddns_hostname) + "\",\"ddns_domain\":\"" + String(cfg.ddns_domain) + "\"}");
-  });
-
-  addOptions("/api/ddns/ipurls");
-  server.on("/api/ddns/ipurls", HTTP_GET, []() {
-    sendCORS();
-    server.send(200, "application/json", "{\"public_ip_urls\":\"" + String(cfg.public_ip_urls) + "\"}");
-  });
-  server.on("/api/ddns/ipurls", HTTP_POST, []() {
-    if (!checkAuth()) return;
-    String urls = server.arg("urls");
-    if (urls != "") {
-      urls.replace("https://", "");
-      urls.replace("http://", "");
-      strncpy(cfg.public_ip_urls, urls.c_str(), sizeof(cfg.public_ip_urls) - 1);
-    }
-    storageSave();
-    server.send(200, "application/json", "{\"status\":\"saved\",\"public_ip_urls\":\"" + String(cfg.public_ip_urls) + "\"}");
-  });
-
-  addOptions("/api/ddns/refresh-ip");
-  server.on("/api/ddns/refresh-ip", []() {
-    sendCORS();
-    String idxStr = server.arg("idx");
-    String ip, serverUsed;
-    bool success = false;
-    if (idxStr != "") {
-      int idx = idxStr.toInt();
-      String urls = String(cfg.public_ip_urls);
-      int cur = 0;
-      while (urls.length() > 0) {
-        int comma = urls.indexOf(',');
-        String host = (comma == -1) ? urls : urls.substring(0, comma);
-        urls = (comma == -1) ? "" : urls.substring(comma + 1);
-        host.trim();
-        if (host == "") continue;
-        if (cur == idx) { serverUsed = host; break; }
-        cur++;
-      }
-      ip = getPublicIP(idx);
-      if (ip != "") success = true;
-    } else {
-      ip = getPublicIP();
-      if (ip != "") success = true;
-      String urls = String(cfg.public_ip_urls);
-      int comma = urls.indexOf(',');
-      serverUsed = (comma == -1) ? urls : urls.substring(0, comma);
-      serverUsed.trim();
-    }
-    DynamicJsonDocument doc(256);
-    doc["ip"] = ip;
-    doc["server"] = serverUsed;
-    doc["success"] = success;
-    String r; serializeJson(doc, r);
-    server.send(200, "application/json", r);
-  });
-
-  addOptions("/api/resolve");
-  server.on("/api/resolve", []() {
-    sendCORS();
-    String host = server.arg("host");
-    if (host == "") { server.send(400, "application/json", "{\"error\":\"Missing host\"}"); return; }
-    IPAddress ip;
-    if (WiFi.hostByName(host.c_str(), ip)) {
-      server.send(200, "application/json", "{\"host\":\"" + host + "\",\"ip\":\"" + ip.toString() + "\"}");
-    } else {
-      server.send(500, "application/json", "{\"error\":\"DNS failed\"}");
-    }
-  });
-
-  addOptions("/api/curl");
-  server.on("/api/curl", []() {
-    if (!checkAuth()) return;
-    String url = server.arg("url");
-    if (url == "") { sendCORS(); server.send(400, "application/json", "{\"error\":\"Missing url\"}"); return; }
-    if (!url.startsWith("http://") && !url.startsWith("https://")) { sendCORS(); server.send(400, "application/json", "{\"error\":\"Invalid protocol\"}"); return; }
-    if (WiFi.status() != WL_CONNECTED) { sendCORS(); server.send(503, "application/json", "{\"error\":\"WiFi not connected\"}"); return; }
-    HTTPClient http; int code; String payload;
-    http.setTimeout(10000);
-    http.setUserAgent("ESP-DDNS/1.0");
-    WiFiClientSecure cSecure;
-    WiFiClient cPlain;
-    bool isHttps = url.startsWith("https://");
-    if (isHttps) {
-      cSecure.setInsecure();
-      http.begin(cSecure, url);
-    } else {
-      http.begin(cPlain, url);
-    }
-    code = http.GET();
-    auto readPayload = [&]() {
-      WiFiClient *s = http.getStreamPtr();
-      if (!s) return;
-      int maxSize = 10240, total = 0;
-      unsigned long timeout = millis() + 5000;
-      while (millis() < timeout && total < maxSize) {
-        if (s->available()) {
-          payload += (char)s->read();
-          total++;
-          timeout = millis() + 5000;
-        }
-      }
-      if (total >= maxSize) payload += "\n[TRUNCATED at 10KB]";
-    };
-    if (code == HTTP_CODE_OK) {
-      readPayload();
-    } else if (isHttps) {
-      http.end();
-      String httpUrl = "http://" + url.substring(8);
-      http.begin(cPlain, httpUrl);
-      code = http.GET();
-      if (code == HTTP_CODE_OK) {
-        readPayload();
-      } else {
-        payload = "Error (" + String(code) + "): " + http.errorToString(code);
-      }
-    } else {
-      payload = "Error (" + String(code) + "): " + http.errorToString(code);
-    }
-    http.end();
-    server.send(200, "text/plain", payload);
-  });
-
-  addOptions("/api/gpio/info");
-  server.on("/api/gpio/info", []() {
-    sendCORS();
-    server.send(200, "application/json", gpioInfo());
-  });
-
-  addOptions("/api/gpio/read");
-  server.on("/api/gpio/read", []() {
-    sendCORS();
-    int pin = server.arg("pin").toInt();
-    server.send(200, "application/json", gpioRead(pin));
-  });
-
-  addOptions("/api/gpio/analog/read");
-  server.on("/api/gpio/analog/read", []() {
-    sendCORS();
-    server.send(200, "application/json", analogReadPin());
-  });
-
-  addOptions("/api/gpio/analog/write");
-  server.on("/api/gpio/analog/write", HTTP_POST, []() {
-    if (!checkAuth()) return;
-    int pin = server.arg("pin").toInt();
-    int value = server.arg("value").toInt();
-    server.send(200, "application/json", analogWritePin(pin, value));
-  });
-
-  addOptions("/api/gpio/set");
-  server.on("/api/gpio/set", HTTP_POST, []() {
-    if (!checkAuth()) return;
-    int pin = server.arg("pin").toInt();
-    String mode = server.arg("mode");
-    String value = server.arg("value");
-    server.send(200, "application/json", gpioSet(pin, mode, value));
-  });
-
-  addOptions("/api/led/pin");
-  server.on("/api/led/pin", HTTP_POST, []() {
-    if (!checkAuth()) return;
-    int pin = server.arg("pin").toInt();
-    if (pin < 0 || pin > 16) { server.send(400, "application/json", "{\"error\":\"Invalid pin\"}"); return; }
-    cfg.led_pin = pin;
-    pinMode(cfg.led_pin, OUTPUT);
-    digitalWrite(cfg.led_pin, cfg.gpio_invert ? LOW : HIGH);
-    storageSave();
-    server.send(200, "application/json", "{\"status\":\"saved\",\"led_pin\":" + String(cfg.led_pin) + "}");
-  });
-
-  addOptions("/api/gpio/invert");
-  server.on("/api/gpio/invert", HTTP_POST, []() {
-    if (!checkAuth()) return;
-    String enabled = server.arg("enabled");
-    cfg.gpio_invert = (enabled == "1" || enabled == "true") ? 1 : 0;
-    storageSave();
-    server.send(200, "application/json", "{\"status\":\"saved\",\"gpio_invert\":" + String(cfg.gpio_invert) + "}");
-  });
-
-  addOptions("/api/set/ssid");
-  server.on("/api/set/ssid", HTTP_POST, []() {
-    if (!checkAuth()) return;
-    String s = server.arg("ssid");
-    if (s == "") { server.send(400, "application/json", "{\"error\":\"Missing ssid\"}"); return; }
-    strncpy(cfg.wifi_ssid, s.c_str(), sizeof(cfg.wifi_ssid) - 1);
-    storageSave();
-    server.send(200, "application/json", "{\"status\":\"saved\"}");
-  });
-
-  addOptions("/api/set/pswd");
-  server.on("/api/set/pswd", HTTP_POST, []() {
-    if (!checkAuth()) return;
-    String p = server.arg("pswd");
-    if (p == "") { server.send(400, "application/json", "{\"error\":\"Missing pswd\"}"); return; }
-    strncpy(cfg.wifi_password, p.c_str(), sizeof(cfg.wifi_password) - 1);
-    storageSave();
-    server.send(200, "application/json", "{\"status\":\"saved\"}");
-  });
-
-  addOptions("/api/set/mdns");
-  server.on("/api/set/mdns", HTTP_POST, []() {
-    if (!checkAuth()) return;
-    String m = server.arg("mdns");
-    if (m == "") { server.send(400, "application/json", "{\"error\":\"Missing mdns\"}"); return; }
-    strncpy(cfg.mdns_name, m.c_str(), sizeof(cfg.mdns_name) - 1);
-    storageSave();
-    server.send(200, "application/json", "{\"status\":\"saved\",\"mdns\":\"" + String(cfg.mdns_name) + "\"}");
-  });
-
-  addOptions("/api/ntp/set");
-  server.on("/api/ntp/set", HTTP_POST, []() {
-    if (!checkAuth()) return;
-    String server_name = server.arg("server");
-    String tz = server.arg("tz_offset");
-    if (server_name != "") strncpy(cfg.ntp_server, server_name.c_str(), sizeof(cfg.ntp_server) - 1);
-    if (tz != "") cfg.tz_offset = tz.toInt();
-    storageSave();
-    server.send(200, "application/json", "{\"status\":\"saved\",\"ntp_server\":\"" + String(cfg.ntp_server) + "\",\"tz_offset\":" + String(cfg.tz_offset) + "}");
-  });
-
-  addOptions("/api/wifi/scan");
-  server.on("/api/wifi/scan", []() {
-    if (!checkAuth()) return;
-    int n = WiFi.scanComplete();
-    if (n == WIFI_SCAN_FAILED) {
-      WiFi.scanNetworks(true);
-      server.send(200, "application/json", "{\"status\":\"scanning\"}");
-    } else if (n == WIFI_SCAN_RUNNING) {
-      server.send(200, "application/json", "{\"status\":\"scanning\"}");
-    } else {
-      DynamicJsonDocument doc(2048);
-      JsonArray networks = doc["networks"].to<JsonArray>();
-      for (int i = 0; i < n; i++) {
-        JsonObject net = networks.add<JsonObject>();
-        net["ssid"] = WiFi.SSID(i);
-        net["rssi"] = WiFi.RSSI(i);
-        net["channel"] = WiFi.channel(i);
-        net["encryption"] = WiFi.encryptionType(i);
-      }
-      String r; serializeJson(doc, r);
-      WiFi.scanDelete();
-      server.send(200, "application/json", r);
-    }
-  });
-
-  addOptions("/api/dns/set");
-  server.on("/api/dns/set", HTTP_POST, []() {
-    if (!checkAuth()) return;
-    String dns1 = server.arg("dns1");
-    String dns2 = server.arg("dns2");
-    String ucd = server.arg("use_custom_dns");
-    if (dns1 != "") strncpy(cfg.static_dns1, dns1.c_str(), sizeof(cfg.static_dns1) - 1);
-    if (dns2 != "") strncpy(cfg.static_dns2, dns2.c_str(), sizeof(cfg.static_dns2) - 1);
-    if (ucd != "") cfg.use_custom_dns = (ucd == "1" || ucd == "true") ? 1 : 0;
-    storageSave();
-    if (cfg.use_custom_dns) {
-      applyNetworkConfig();
-    } else {
-      WiFi.config(WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask());
-    }
-    bool valid = validateNetworkConfig();
-    DynamicJsonDocument doc(512);
-    doc["status"] = "saved";
-    doc["dns1"] = cfg.static_dns1;
-    doc["dns2"] = cfg.static_dns2;
-    doc["use_custom_dns"] = cfg.use_custom_dns;
-    if (!valid) doc["warning"] = "config invalid, switched to DHCP";
-    String r; serializeJson(doc, r);
-    server.send(200, "application/json", r);
-  });
-
-  addOptions("/api/ip/config");
-  server.on("/api/ip/config", HTTP_POST, []() {
-    if (!checkAuth()) return;
-    String dhcp = server.arg("dhcp");
-    cfg.use_static_ip = (dhcp == "0" || dhcp == "false") ? 1 : 0;
-    if (cfg.use_static_ip) {
-      String ip = server.arg("ip");
-      String gw = server.arg("gateway");
-      String subnet = server.arg("subnet");
-      if (ip != "") strncpy(cfg.static_ip, ip.c_str(), sizeof(cfg.static_ip) - 1);
-      if (gw != "") strncpy(cfg.static_gateway, gw.c_str(), sizeof(cfg.static_gateway) - 1);
-      if (subnet != "") strncpy(cfg.static_subnet, subnet.c_str(), sizeof(cfg.static_subnet) - 1);
-    }
-    storageSave();
-    bool valid = validateNetworkConfig();
-    DynamicJsonDocument doc(512);
-    doc["status"] = "saved";
-    doc["use_static_ip"] = cfg.use_static_ip;
-    if (!valid) doc["warning"] = "config invalid, switched to DHCP";
-    String r; serializeJson(doc, r);
-    server.send(200, "application/json", r);
-  });
-
-  addOptions("/api/pwm/pin");
-  server.on("/api/pwm/pin", HTTP_POST, []() {
-    if (!checkAuth()) return;
-    int pin = server.arg("pin").toInt();
-    if (pin < 0 || pin > 16) { server.send(400, "application/json", "{\"error\":\"Invalid pin\"}"); return; }
-    cfg.pwm_pin = pin;
-    storageSave();
-    server.send(200, "application/json", "{\"status\":\"saved\",\"pwm_pin\":" + String(cfg.pwm_pin) + "}");
   });
 
   addOptions("/api/system/reboot");
@@ -625,7 +277,7 @@ void setupRoutes() {
   addOptions("/api/config/export");
   server.on("/api/config/export", []() {
     if (!checkAuth()) return;
-    DynamicJsonDocument doc(4096);
+    DynamicJsonDocument doc(2048);
     doc["wifi_ssid"] = cfg.wifi_ssid;
     doc["wifi_password"] = cfg.wifi_password;
     doc["mdns_name"] = cfg.mdns_name;
@@ -661,11 +313,11 @@ void setupRoutes() {
     if (!checkAuth()) return;
     String body = server.arg("config");
     if (body == "") { server.send(400, "application/json", "{\"error\":\"Missing JSON body\"}"); return; }
-    DynamicJsonDocument doc(2048);
+    DynamicJsonDocument doc(1024);
     DeserializationError err = deserializeJson(doc, body);
     if (err) { server.send(400, "application/json", "{\"error\":\"Invalid JSON\"}"); return; }
     auto setStr = [&](const char* key, char* dest, size_t sz) {
-      if (doc[key].is<const char*>()) strncpy(dest, doc[key], sz - 1);
+      if (doc[key].is<const char*>()) { strncpy(dest, doc[key], sz - 1); dest[sz - 1] = '\0'; }
     };
     auto setInt = [&](const char* key, int& dest) {
       if (doc[key].is<int>()) dest = doc[key].as<int>();
@@ -780,7 +432,7 @@ void setupRoutes() {
   addOptions("/api/network/status");
   server.on("/api/network/status", []() {
     sendCORS();
-    DynamicJsonDocument doc(1024);
+    DynamicJsonDocument doc(512);
     doc["ssid"] = WiFi.SSID();
     doc["bssid"] = WiFi.BSSIDstr();
     doc["rssi"] = WiFi.RSSI();
@@ -815,7 +467,7 @@ void setupRoutes() {
     if (n == WIFI_SCAN_FAILED) { WiFi.scanNetworks(true); server.send(200, "application/json", "{\"status\":\"scanning\"}"); }
     else if (n == WIFI_SCAN_RUNNING) { server.send(200, "application/json", "{\"status\":\"scanning\"}"); }
     else {
-      DynamicJsonDocument doc(2048); JsonArray networks = doc["networks"].to<JsonArray>();
+      DynamicJsonDocument doc(1024); JsonArray networks = doc["networks"].to<JsonArray>();
       for (int i = 0; i < n; i++) {
         JsonObject net = networks.add<JsonObject>();
         net["ssid"] = WiFi.SSID(i); net["rssi"] = WiFi.RSSI(i);
@@ -836,7 +488,7 @@ void setupRoutes() {
     if (!checkAuth()) return;
     String s = server.arg("ssid");
     if (s == "") { server.send(400, "application/json", "{\"error\":\"Missing ssid\"}"); return; }
-    strncpy(cfg.wifi_ssid, s.c_str(), sizeof(cfg.wifi_ssid) - 1);
+    strncpy(cfg.wifi_ssid, s.c_str(), sizeof(cfg.wifi_ssid) - 1); cfg.wifi_ssid[sizeof(cfg.wifi_ssid) - 1] = '\0';
     storageSave();
     server.send(200, "application/json", "{\"status\":\"saved\",\"ssid\":\"" + String(cfg.wifi_ssid) + "\"}");
   });
@@ -846,7 +498,7 @@ void setupRoutes() {
     if (!checkAuth()) return;
     String p = server.arg("password");
     if (p == "") { server.send(400, "application/json", "{\"error\":\"Missing password\"}"); return; }
-    strncpy(cfg.wifi_password, p.c_str(), sizeof(cfg.wifi_password) - 1);
+    strncpy(cfg.wifi_password, p.c_str(), sizeof(cfg.wifi_password) - 1); cfg.wifi_password[sizeof(cfg.wifi_password) - 1] = '\0';
     storageSave();
     server.send(200, "application/json", "{\"status\":\"saved\"}");
   });
@@ -867,9 +519,9 @@ void setupRoutes() {
     String dhcp = server.arg("dhcp");
     cfg.use_static_ip = (dhcp == "0" || dhcp == "false") ? 1 : 0;
     if (cfg.use_static_ip) {
-      if (server.arg("ip") != "") strncpy(cfg.static_ip, server.arg("ip").c_str(), sizeof(cfg.static_ip) - 1);
-      if (server.arg("gateway") != "") strncpy(cfg.static_gateway, server.arg("gateway").c_str(), sizeof(cfg.static_gateway) - 1);
-      if (server.arg("subnet") != "") strncpy(cfg.static_subnet, server.arg("subnet").c_str(), sizeof(cfg.static_subnet) - 1);
+      if (server.arg("ip") != "") { strncpy(cfg.static_ip, server.arg("ip").c_str(), sizeof(cfg.static_ip) - 1); cfg.static_ip[sizeof(cfg.static_ip) - 1] = '\0'; }
+      if (server.arg("gateway") != "") { strncpy(cfg.static_gateway, server.arg("gateway").c_str(), sizeof(cfg.static_gateway) - 1); cfg.static_gateway[sizeof(cfg.static_gateway) - 1] = '\0'; }
+      if (server.arg("subnet") != "") { strncpy(cfg.static_subnet, server.arg("subnet").c_str(), sizeof(cfg.static_subnet) - 1); cfg.static_subnet[sizeof(cfg.static_subnet) - 1] = '\0'; }
     }
     storageSave();
     applyNetworkConfig();
@@ -892,8 +544,8 @@ void setupRoutes() {
   });
   server.on("/api/network/dns/config", HTTP_POST, []() {
     if (!checkAuth()) return;
-    if (server.arg("dns1") != "") strncpy(cfg.static_dns1, server.arg("dns1").c_str(), sizeof(cfg.static_dns1) - 1);
-    if (server.arg("dns2") != "") strncpy(cfg.static_dns2, server.arg("dns2").c_str(), sizeof(cfg.static_dns2) - 1);
+    if (server.arg("dns1") != "") { strncpy(cfg.static_dns1, server.arg("dns1").c_str(), sizeof(cfg.static_dns1) - 1); cfg.static_dns1[sizeof(cfg.static_dns1) - 1] = '\0'; }
+    if (server.arg("dns2") != "") { strncpy(cfg.static_dns2, server.arg("dns2").c_str(), sizeof(cfg.static_dns2) - 1); cfg.static_dns2[sizeof(cfg.static_dns2) - 1] = '\0'; }
     String ucd = server.arg("use_custom_dns");
     if (ucd != "") cfg.use_custom_dns = (ucd == "1" || ucd == "true") ? 1 : 0;
     storageSave();
@@ -1193,7 +845,7 @@ void setupRoutes() {
   addOptions("/api/wifi/networks");
   server.on("/api/wifi/networks", HTTP_GET, []() {
     if (!checkAuth()) return;
-    DynamicJsonDocument doc(1024);
+    DynamicJsonDocument doc(512);
     JsonArray arr = doc["networks"].to<JsonArray>();
     for (int i = 0; i < networkListCount(); i++) {
       WifiNetwork net;
@@ -1318,6 +970,7 @@ void setupRoutes() {
     storageSave();
     server.send(200, "application/json", "{\"status\":\"saved\"}");
   });
+  addOptions("/api/system/ota/check");
   server.on("/api/system/ota/check", HTTP_POST, []() {
     if (!checkAuth()) return;
     bool ok = otaCheckNow();

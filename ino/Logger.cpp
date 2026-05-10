@@ -14,6 +14,7 @@ void logAdd(unsigned long ms, String msg) {
 
 void logPrint(const String& tag, const String& msg) {
   String line = "[" + tag + "] " + msg;
+  if (line.length() > 128) line = line.substring(0, 128);
   Serial.println(line);
   logAdd(millis(), line);
 }
