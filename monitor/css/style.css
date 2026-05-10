@@ -384,7 +384,6 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 1rem;
-  grid-auto-rows: 1fr;
 }
 
 .card {
@@ -456,6 +455,31 @@ body {
   transition: all var(--transition);
 }
 .card-action-btn:hover { color: var(--green); border-color: var(--green); }
+
+/* Card Sections */
+.card-section + .card-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.card-section-title {
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+  margin-bottom: 0.7rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid rgba(0,255,136,0.08);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.card-section-title .card-action-btn {
+  margin-left: auto;
+}
 
 /* Info Grid */
 .info-grid {
@@ -1100,12 +1124,29 @@ body {
   background: rgba(0,255,136,0.06);
   color: var(--green);
 }
+.scan-table tr.scan-row-saved td {
+  background: rgba(0,136,255,0.04);
+}
 .scan-table tr.selected td {
   background: var(--green-dark) !important;
   color: var(--text-bright);
 }
 .scan-table tbody tr {
   cursor: pointer;
+}
+
+.scan-status-td {
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+.scan-table tr.scan-row-current .scan-status-td {
+  color: var(--green);
+  font-weight: 700;
+}
+.scan-table tr.scan-row-saved .scan-status-td {
+  color: var(--amber);
 }
 
 /* ── API List ── */

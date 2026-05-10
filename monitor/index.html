@@ -534,42 +534,78 @@
         <div class="card card--wide">
           <div class="card-header">
             <span class="card-icon">⌁</span>
-            <span class="card-title">WIFI CONFIGURATION</span>
+            <span class="card-title">WIFI</span>
+            <button class="card-action-btn" id="btn-wifi-scan">SCAN</button>
           </div>
+
           <div class="wifi-warning">
             <span class="warning-icon">⚠</span>
             Changes are saved to EEPROM and take effect on next WiFi reconnect. Ensure credentials are correct before saving.
           </div>
-          <div class="wifi-form">
-            <div class="form-field">
-              <label class="field-label">SSID</label>
-              <div class="field-row">
-                <span class="field-prefix">⌁</span>
-                <input type="text" class="field-input" id="wifi-ssid" placeholder="Network name" />
+
+          <div class="card-section">
+            <div class="card-section-title">CONFIGURATION</div>
+            <div class="wifi-form">
+              <div class="form-row">
+                <div class="form-field">
+                  <label class="field-label">SSID</label>
+                  <div class="field-row">
+                    <span class="field-prefix">⌁</span>
+                    <input type="text" class="field-input" id="wifi-ssid" placeholder="Network name" />
+                  </div>
+                </div>
+                <div class="form-field">
+                  <label class="field-label">PASSWORD</label>
+                  <div class="field-row">
+                    <span class="field-prefix">##</span>
+                    <input type="password" class="field-input" id="wifi-pswd" placeholder="Network password" />
+                  </div>
+                </div>
               </div>
+              <div class="form-row">
+                <button class="btn-action btn-primary" id="btn-save-ssid">SAVE SSID</button>
+                <button class="btn-action btn-primary" id="btn-save-pswd">SAVE PASSWORD</button>
+              </div>
+              <div class="action-result hidden" id="wifi-result"></div>
             </div>
-            <div class="form-field">
-              <label class="field-label">PASSWORD</label>
-              <div class="field-row">
-                <span class="field-prefix">##</span>
-                <input type="password" class="field-input" id="wifi-pswd" placeholder="Network password" />
+          </div>
+
+          <div class="card-section">
+            <div class="card-section-title">
+              SAVED NETWORKS
+              <button class="card-action-btn" id="btn-networks-refresh">REFRESH</button>
+            </div>
+            <div id="networks-list">
+              <div class="scan-status">Click REFRESH to load saved networks.</div>
+            </div>
+            <hr class="form-divider">
+            <div class="form-row">
+              <div class="form-field">
+                <label class="field-label">ADD NETWORK — SSID</label>
+                <div class="field-row">
+                  <span class="field-prefix">⌁</span>
+                  <input type="text" class="field-input" id="network-add-ssid" placeholder="SSID" />
+                </div>
               </div>
             </div>
             <div class="form-row">
-              <button class="btn-action btn-primary" id="btn-save-ssid">SAVE SSID</button>
-              <button class="btn-action btn-primary" id="btn-save-pswd">SAVE PASSWORD</button>
+              <div class="form-field">
+                <label class="field-label">PASSWORD</label>
+                <div class="field-row">
+                  <span class="field-prefix">##</span>
+                  <input type="password" class="field-input" id="network-add-pswd" placeholder="Password" />
+                </div>
+              </div>
             </div>
-            <div class="action-result hidden" id="wifi-result"></div>
+            <div class="form-row">
+              <button class="btn-action btn-primary" id="btn-network-add">ADD NETWORK</button>
+              <button class="btn-action btn-primary" id="btn-network-connect">CONNECT NOW</button>
+            </div>
+            <div class="action-result hidden" id="network-result"></div>
           </div>
-        </div>
 
-        <div class="card card--wide">
-          <div class="card-header">
-            <span class="card-icon">⌁</span>
-            <span class="card-title">WIFI SCAN</span>
-            <button class="card-action-btn" id="btn-wifi-scan">SCAN</button>
-          </div>
-          <div class="action-block">
+          <div class="card-section">
+            <div class="card-section-title">SCAN RESULTS</div>
             <div class="scan-status" id="scan-status">Click SCAN to list available networks.</div>
             <div class="scan-results hidden" id="scan-results"></div>
           </div>
@@ -631,43 +667,6 @@
               </div>
             </div>
             <div class="action-result hidden" id="ap-result"></div>
-          </div>
-        </div>
-
-        <div class="card card--wide">
-          <div class="card-header">
-            <span class="card-icon">⌁</span>
-            <span class="card-title">SAVED NETWORKS</span>
-            <button class="card-action-btn" id="btn-networks-refresh">REFRESH</button>
-          </div>
-          <div class="action-block">
-            <div id="networks-list">
-              <div class="scan-status">Click REFRESH to load saved networks.</div>
-            </div>
-            <hr class="form-divider">
-            <div class="form-row">
-              <div class="form-field">
-                <label class="field-label">ADD NETWORK — SSID</label>
-                <div class="field-row">
-                  <span class="field-prefix">⌁</span>
-                  <input type="text" class="field-input" id="network-add-ssid" placeholder="SSID" />
-                </div>
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-field">
-                <label class="field-label">PASSWORD</label>
-                <div class="field-row">
-                  <span class="field-prefix">##</span>
-                  <input type="password" class="field-input" id="network-add-pswd" placeholder="Password" />
-                </div>
-              </div>
-            </div>
-            <div class="form-row">
-              <button class="btn-action btn-primary" id="btn-network-add">ADD NETWORK</button>
-              <button class="btn-action btn-primary" id="btn-network-connect">CONNECT NOW</button>
-            </div>
-            <div class="action-result hidden" id="network-result"></div>
           </div>
         </div>
 

@@ -16,6 +16,8 @@ const state = {
   bootEpoch: null,
 };
 
+let savedSsidList = [];
+
 const ESP8266_PIN_LABELS = {
   0: 'D3', 1: 'TX', 2: 'D4', 3: 'RX', 4: 'D2', 5: 'D1',
   9: 'SD2', 10: 'SD3', 12: 'D6', 13: 'D7', 14: 'D5', 15: 'D8', 16: 'D0'
@@ -901,16 +903,24 @@ function renderScanResults(networks) {
 
   const table = document.createElement('table');
   table.className = 'scan-table';
-  table.innerHTML = `<thead><tr><th>SSID</th><th>RSSI</th><th>SIGNAL</th><th>CH</th><th>ENC</th></tr></thead>`;
+  table.innerHTML = `<thead><tr><th>SSID</th><th>RSSI</th><th>SIGNAL</th><th>CH</th><th>ENC</th><th>STATUS</th></tr></thead>`;
   const tbody = document.createElement('tbody');
   for (const net of networks) {
     const row = document.createElement('tr');
     const enc = encLabels[net.encryption] || `Type ${net.encryption}`;
     const rssiPct = Math.max(0, Math.min(100, Math.round(((net.rssi + 100) / 60) * 100)));
     const isCurrent = net.ssid && currentSsid && net.ssid === currentSsid;
-    if (isCurrent) row.className = 'scan-row-current';
+    const isSaved = net.ssid && savedSsidList.includes(net.ssid);
+    let status = '';
+    if (isCurrent) {
+      row.className = 'scan-row-current';
+      status = 'CURRENT';
+    } else if (isSaved) {
+      row.className = 'scan-row-saved';
+      status = 'SAVED';
+    }
     row.dataset.ssid = net.ssid || '';
-    row.innerHTML = `<td>${escapeHtml(net.ssid)}</td><td>${net.rssi} dBm</td><td>${rssiPct}%</td><td>${net.channel}</td><td>${enc}</td>`;
+    row.innerHTML = `<td>${escapeHtml(net.ssid)}</td><td>${net.rssi} dBm</td><td>${rssiPct}%</td><td>${net.channel}</td><td>${enc}</td><td class="scan-status-td">${status}</td>`;
     row.addEventListener('click', () => {
       document.querySelectorAll('.scan-table tbody tr.selected').forEach(r => r.classList.remove('selected'));
       row.classList.add('selected');
@@ -1423,6 +1433,7 @@ async function loadSavedNetworks() {
   try {
     const data = await apiFetch('/api/wifi/networks', { auth: true });
     const networks = data.networks || [];
+    savedSsidList = networks.map(n => n.ssid);
     if (!networks.length) {
       container.innerHTML = '<div class="scan-status">No networks saved. Add one below.</div>';
       return;
