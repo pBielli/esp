@@ -2,7 +2,6 @@
 #include "Config.h"
 #include "Logger.h"
 
-WiFiUDP ntpUdp;
 unsigned long lastNtpSync = 0;
 const unsigned long ntpSyncInterval = 86400000;
 

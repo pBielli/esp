@@ -19,7 +19,7 @@ String base64Decode(String input) {
   int buf = 0, bits = 0;
   for (int i = 0; i < len; i++) {
     char c = input[i];
-    if (c == '=') break;
+    if (c == '=') { bits = 0; continue; }
     const char* p = strchr(b64, c);
     if (!p) continue;
     int val = p - b64;
@@ -93,44 +93,72 @@ void setupRoutes() {
       JsonArray p = o["params"].to<JsonArray>();
       for (auto& par : params) p.add(par);
     };
-    add("/api/info",              "GET",  false, {});
-    add("/api/myip",              "GET",  false, {});
-    add("/api/help",              "GET",  false, {});
-    add("/api/time",              "GET",  false, {});
-    add("/api/log",               "GET",  true,  {});
-    add("/api/blink",             "GET",  true,  {"times"});
-    add("/api/ddns/update",       "POST", true,  {});
-    add("/api/ddns/config",       "POST", true,  {"hostname","domain","token","upd_url"});
-    add("/api/resolve",           "GET",  false, {"host"});
-    add("/api/curl",              "GET",  true,  {"url"});
-    add("/api/gpio/info",         "GET",  false, {});
-    add("/api/gpio/read",         "GET",  false, {"pin"});
-    add("/api/gpio/analog/read",  "GET",  false, {});
-    add("/api/gpio/analog/write", "POST", true,  {"pin","value"});
-    add("/api/gpio/set",          "POST", true,  {"pin","mode","value"});
-    add("/api/led/pin",           "POST", true,  {"pin"});
-    add("/api/gpio/invert",       "POST", true,  {"enabled"});
-    add("/api/ddns/check",        "GET",  false, {});
-    add("/api/ntp/set",           "POST", true,  {"server","tz_offset"});
-    add("/api/wifi/scan",         "GET",  true,  {});
-    add("/api/set/mdns",          "POST", true,  {"mdns"});
-    add("/api/dns/set",           "POST", true,  {"dns1","dns2"});
-    add("/api/ip/config",         "POST", true,  {"dhcp","ip","gateway","subnet"});
-    add("/api/pwm/pin",           "POST", true,  {"pin"});
-    add("/api/set/ssid",          "POST", true,  {"ssid"});
-    add("/api/set/pswd",          "POST", true,  {"pswd"});
-    add("/api/ping",              "GET",  true,  {"host"});
-    add("/api/system/reboot",     "POST", true,  {});
-    add("/api/system/factory-reset", "POST", true, {});
-    add("/api/system/version",    "GET",  true,  {});
-    add("/api/config/export",     "GET",  true,  {});
-    add("/api/config/import",     "POST", true,  {"config"});
-    add("/api/ddns/interval",     "POST", true,  {"interval"});
-    add("/api/ddns/ipurls",       "POST", true,  {"urls"});
-    add("/api/ddns/refresh-ip",   "GET",  false, {"idx"});
-    add("/api/gpio/pulse",        "POST", true,  {"pin","ms"});
-    add("/api/gpio/toggle",       "POST", true,  {"pin"});
-    add("/api/gpio/blink",        "POST", true,  {"pin","times","ms"});
+    // ── New REST API ──
+    add("/api/status",              "GET",  false, {});
+    add("/api/help",                "GET",  false, {});
+    add("/api/system/status",       "GET",  false, {});
+    add("/api/system/log",          "GET",  true,  {});
+    add("/api/system/reboot",       "POST", true,  {});
+    add("/api/system/factory-reset","POST", true,  {});
+    add("/api/network/status",      "GET",  false, {});
+    add("/api/network/wifi/scan",   "GET",  true,  {});
+    add("/api/network/wifi/ssid",   "POST", true,  {"ssid"});
+    add("/api/network/wifi/password","POST", true,  {"password"});
+    add("/api/network/ip/config",   "GET",  true,  {});
+    add("/api/network/ip/config",   "POST", true,  {"dhcp","ip","gateway","subnet"});
+    add("/api/network/dns/config",  "GET",  true,  {});
+    add("/api/network/dns/config",  "POST", true,  {"dns1","dns2","use_custom_dns"});
+    add("/api/network/mdns",        "GET",  false, {});
+    add("/api/network/mdns",        "POST", true,  {"mdns"});
+    add("/api/network/public-ip",   "GET",  false, {});
+    add("/api/network/public-ip/check","POST",true,  {"idx"});
+    add("/api/ntp/time",            "GET",  false, {});
+    add("/api/ntp/config",          "GET",  false, {});
+    add("/api/ntp/config",          "POST", true,  {"server","tz_offset"});
+    add("/api/gpio",                "GET",  true,  {});
+    add("/api/gpio/read",           "GET",  true,  {"pin"});
+    add("/api/gpio/set",            "POST", true,  {"pin","mode","value"});
+    add("/api/gpio/blink",          "POST", true,  {"pin","times","ms"});
+    add("/api/gpio/pulse",          "POST", true,  {"pin","ms"});
+    add("/api/gpio/toggle",         "POST", true,  {"pin"});
+    add("/api/gpio/analog",         "GET",  true,  {});
+    add("/api/gpio/analog",         "POST", true,  {"pin","value"});
+    add("/api/gpio/config/invert",  "GET",  false, {});
+    add("/api/gpio/config/invert",  "POST", true,  {"enabled"});
+    add("/api/gpio/config/pwm-pin", "GET",  false, {});
+    add("/api/gpio/config/pwm-pin", "POST", true,  {"pin"});
+    add("/api/ddns/status",         "GET",  false, {});
+    add("/api/ddns/check",          "POST", true,  {});
+    add("/api/ddns/update",         "POST", true,  {});
+    add("/api/ddns/config",         "GET",  false, {});
+    add("/api/ddns/config",         "POST", true,  {"hostname","domain","token","upd_url"});
+    add("/api/ddns/interval",       "POST", true,  {"interval"});
+    add("/api/ddns/ip-urls",        "GET",  false, {});
+    add("/api/ddns/ip-urls",        "POST", true,  {"urls"});
+    add("/api/ddns/led/pin",        "GET",  false, {});
+    add("/api/ddns/led/pin",        "POST", true,  {"pin"});
+    add("/api/ping",                "POST", true,  {"host"});
+    add("/api/dns/resolve",         "POST", true,  {"host"});
+    add("/api/http/fetch",          "POST", true,  {"url"});
+    add("/api/config/export",       "GET",  true,  {});
+    add("/api/config/import",       "POST", true,  {"config"});
+    // ── Legacy endpoints (deprecated) ──
+    add("/api/info",                "GET",  false, {});
+    add("/api/ddns/update",         "POST", true,  {});
+    add("/api/ddns/config",         "POST", true,  {"hostname","domain","token","upd_url"});
+    add("/api/gpio/info",           "GET",  false, {});
+    add("/api/gpio/read",           "GET",  false, {"pin"});
+    add("/api/gpio/analog/write",   "POST", true,  {"pin","value"});
+    add("/api/gpio/set",            "POST", true,  {"pin","mode","value"});
+    add("/api/ddns/check",          "GET",  false, {});
+    add("/api/system/reboot",       "POST", true,  {});
+    add("/api/system/factory-reset","POST", true,  {});
+    add("/api/config/export",       "GET",  true,  {});
+    add("/api/config/import",       "POST", true,  {"config"});
+    add("/api/ddns/interval",       "POST", true,  {"interval"});
+    add("/api/gpio/pulse",          "POST", true,  {"pin","ms"});
+    add("/api/gpio/toggle",         "POST", true,  {"pin"});
+    add("/api/gpio/blink",          "POST", true,  {"pin","times","ms"});
     String r; serializeJson(doc, r);
     server.send(200, "application/json", r);
   });
@@ -141,7 +169,11 @@ void setupRoutes() {
     JsonDocument doc;
     doc["mac"] = WiFi.macAddress();
     doc["ssid"] = WiFi.SSID();
+    doc["bssid"] = WiFi.BSSIDstr();
     doc["rssi"] = WiFi.RSSI();
+    doc["channel"] = WiFi.channel();
+    { uint8 phy = WiFi.getPhyMode(); doc["phy_mode"] = (phy == 2 ? "11g" : phy == 3 ? "11n" : "11b"); }
+    doc["tx_power"] = WiFi.getTxPower();
     doc["mdns"] = cfg.mdns_name;
     doc["ddns"] = cfg.ddns_hostname;
     doc["ddns_domain"] = cfg.ddns_domain;
@@ -695,6 +727,444 @@ void setupRoutes() {
     int ms = server.arg("ms").toInt();
     if (ms < 10 || ms > 5000) ms = 200;
     server.send(200, "application/json", gpioBlink(pin, times, ms));
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // NEW REST API ROUTES — alongside old ones for now
+  // ═══════════════════════════════════════════════════════════════
+
+  // ── /api/status (compact overview) ──
+  addOptions("/api/status");
+  server.on("/api/status", []() {
+    sendCORS();
+    JsonDocument doc;
+    doc["version"] = FIRMWARE_VERSION;
+    doc["uptime"] = millis() / 1000;
+    doc["free_heap"] = ESP.getFreeHeap();
+    doc["wifi_connected"] = WiFi.status() == WL_CONNECTED;
+    doc["ssid"] = WiFi.SSID();
+    doc["local_ip"] = WiFi.localIP().toString();
+    doc["ddns_match"] = lastCheckMatch;
+    doc["rssi"] = WiFi.RSSI();
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
+  });
+
+  // ── SYSTEM ──
+  addOptions("/api/system/status");
+  server.on("/api/system/status", []() {
+    sendCORS();
+    JsonDocument doc;
+    doc["version"] = FIRMWARE_VERSION;
+    doc["build_date"] = __DATE__;
+    doc["build_time"] = __TIME__;
+    doc["mac"] = WiFi.macAddress();
+    doc["uptime"] = millis() / 1000;
+    doc["free_heap"] = ESP.getFreeHeap();
+    doc["last_check_time"] = (long)(lastCheckTime > 0 ? millis() - lastCheckTime : -1);
+    doc["last_check_match"] = lastCheckMatch;
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
+  });
+
+  addOptions("/api/system/log");
+  server.on("/api/system/log", []() {
+    if (!checkAuth()) return;
+    server.send(200, "application/json", logGet());
+  });
+
+  // ── NETWORK ──
+  addOptions("/api/network/status");
+  server.on("/api/network/status", []() {
+    sendCORS();
+    JsonDocument doc;
+    doc["ssid"] = WiFi.SSID();
+    doc["bssid"] = WiFi.BSSIDstr();
+    doc["rssi"] = WiFi.RSSI();
+    doc["channel"] = WiFi.channel();
+    uint8 phy = WiFi.getPhyMode();
+    const char* phyStr = "11b";
+    if (phy == 2) phyStr = "11g"; else if (phy == 3) phyStr = "11n";
+    doc["phy_mode"] = phyStr;
+    doc["tx_power"] = WiFi.getTxPower();
+    doc["mac"] = WiFi.macAddress();
+    doc["local_ip"] = WiFi.localIP().toString();
+    doc["gateway"] = WiFi.gatewayIP().toString();
+    doc["subnet"] = WiFi.subnetMask().toString();
+    doc["dns1"] = WiFi.dnsIP(0).toString();
+    doc["dns2"] = WiFi.dnsIP(1).toString();
+    doc["hostname"] = WiFi.hostname();
+    doc["mdns"] = cfg.mdns_name;
+    doc["wifi_status"] = WiFi.status() == WL_CONNECTED ? "connected" : "disconnected";
+    doc["auto_reconnect"] = WiFi.getAutoReconnect();
+    doc["use_static_ip"] = cfg.use_static_ip;
+    doc["public_ip"] = getCachedPublicIP();
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
+  });
+
+  addOptions("/api/network/wifi/scan");
+  server.on("/api/network/wifi/scan", []() {
+    if (!checkAuth()) return;
+    int n = WiFi.scanComplete();
+    if (n == WIFI_SCAN_FAILED) { WiFi.scanNetworks(true); server.send(200, "application/json", "{\"status\":\"scanning\"}"); }
+    else if (n == WIFI_SCAN_RUNNING) { server.send(200, "application/json", "{\"status\":\"scanning\"}"); }
+    else {
+      JsonDocument doc; JsonArray networks = doc["networks"].to<JsonArray>();
+      for (int i = 0; i < n; i++) {
+        JsonObject net = networks.add<JsonObject>();
+        net["ssid"] = WiFi.SSID(i); net["rssi"] = WiFi.RSSI(i);
+        net["channel"] = WiFi.channel(i); net["encryption"] = WiFi.encryptionType(i);
+        uint8_t* bssid = WiFi.BSSID(i);
+        if (bssid) {
+          char bssidStr[18]; snprintf(bssidStr, sizeof(bssidStr), "%02X:%02X:%02X:%02X:%02X:%02X", bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+          net["bssid"] = bssidStr;
+        }
+      }
+      String r; serializeJson(doc, r); WiFi.scanDelete();
+      server.send(200, "application/json", r);
+    }
+  });
+
+  addOptions("/api/network/wifi/ssid");
+  server.on("/api/network/wifi/ssid", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    String s = server.arg("ssid");
+    if (s == "") { server.send(400, "application/json", "{\"error\":\"Missing ssid\"}"); return; }
+    strncpy(cfg.wifi_ssid, s.c_str(), sizeof(cfg.wifi_ssid) - 1);
+    storageSave();
+    server.send(200, "application/json", "{\"status\":\"saved\",\"ssid\":\"" + String(cfg.wifi_ssid) + "\"}");
+  });
+
+  addOptions("/api/network/wifi/password");
+  server.on("/api/network/wifi/password", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    String p = server.arg("password");
+    if (p == "") { server.send(400, "application/json", "{\"error\":\"Missing password\"}"); return; }
+    strncpy(cfg.wifi_password, p.c_str(), sizeof(cfg.wifi_password) - 1);
+    storageSave();
+    server.send(200, "application/json", "{\"status\":\"saved\"}");
+  });
+
+  addOptions("/api/network/ip/config");
+  server.on("/api/network/ip/config", HTTP_GET, []() {
+    if (!checkAuth()) return;
+    JsonDocument doc;
+    doc["use_static_ip"] = cfg.use_static_ip;
+    doc["ip"] = cfg.static_ip;
+    doc["gateway"] = cfg.static_gateway;
+    doc["subnet"] = cfg.static_subnet;
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
+  });
+  server.on("/api/network/ip/config", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    String dhcp = server.arg("dhcp");
+    cfg.use_static_ip = (dhcp == "0" || dhcp == "false") ? 1 : 0;
+    if (cfg.use_static_ip) {
+      if (server.arg("ip") != "") strncpy(cfg.static_ip, server.arg("ip").c_str(), sizeof(cfg.static_ip) - 1);
+      if (server.arg("gateway") != "") strncpy(cfg.static_gateway, server.arg("gateway").c_str(), sizeof(cfg.static_gateway) - 1);
+      if (server.arg("subnet") != "") strncpy(cfg.static_subnet, server.arg("subnet").c_str(), sizeof(cfg.static_subnet) - 1);
+    }
+    storageSave();
+    bool valid = validateNetworkConfig();
+    JsonDocument doc; doc["status"] = "saved"; doc["use_static_ip"] = cfg.use_static_ip;
+    if (!valid) doc["warning"] = "config invalid, switched to DHCP";
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
+  });
+
+  addOptions("/api/network/dns/config");
+  server.on("/api/network/dns/config", HTTP_GET, []() {
+    if (!checkAuth()) return;
+    JsonDocument doc;
+    doc["dns1"] = cfg.static_dns1;
+    doc["dns2"] = cfg.static_dns2;
+    doc["use_custom_dns"] = cfg.use_custom_dns;
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
+  });
+  server.on("/api/network/dns/config", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    if (server.arg("dns1") != "") strncpy(cfg.static_dns1, server.arg("dns1").c_str(), sizeof(cfg.static_dns1) - 1);
+    if (server.arg("dns2") != "") strncpy(cfg.static_dns2, server.arg("dns2").c_str(), sizeof(cfg.static_dns2) - 1);
+    String ucd = server.arg("use_custom_dns");
+    if (ucd != "") cfg.use_custom_dns = (ucd == "1" || ucd == "true") ? 1 : 0;
+    storageSave();
+    if (cfg.use_custom_dns) { applyNetworkConfig(); }
+    else { WiFi.config(WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask()); }
+    bool valid = validateNetworkConfig();
+    JsonDocument doc; doc["status"] = "saved"; doc["dns1"] = cfg.static_dns1; doc["dns2"] = cfg.static_dns2; doc["use_custom_dns"] = cfg.use_custom_dns;
+    if (!valid) doc["warning"] = "config invalid, switched to DHCP";
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
+  });
+
+  addOptions("/api/network/mdns");
+  server.on("/api/network/mdns", HTTP_GET, []() {
+    sendCORS();
+    server.send(200, "application/json", "{\"mdns\":\"" + String(cfg.mdns_name) + "\"}");
+  });
+  server.on("/api/network/mdns", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    String m = server.arg("mdns");
+    if (m == "") { server.send(400, "application/json", "{\"error\":\"Missing mdns\"}"); return; }
+    strncpy(cfg.mdns_name, m.c_str(), sizeof(cfg.mdns_name) - 1);
+    storageSave();
+    server.send(200, "application/json", "{\"status\":\"saved\",\"mdns\":\"" + String(cfg.mdns_name) + "\"}");
+  });
+
+  addOptions("/api/network/public-ip");
+  server.on("/api/network/public-ip", HTTP_GET, []() {
+    sendCORS();
+    String ip = getCachedPublicIP();
+    if (ip != "") { server.send(200, "application/json", "{\"public_ip\":\"" + ip + "\"}"); }
+    else { server.send(200, "application/json", "{\"public_ip\":null}"); }
+  });
+
+  addOptions("/api/network/public-ip/check");
+  server.on("/api/network/public-ip/check", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    String idxStr = server.arg("idx");
+    String ip, serverUsed; bool success = false;
+    if (idxStr != "") {
+      int idx = idxStr.toInt();
+      String urls = String(cfg.public_ip_urls); int cur = 0;
+      while (urls.length() > 0) {
+        int comma = urls.indexOf(','); String host = (comma == -1) ? urls : urls.substring(0, comma);
+        urls = (comma == -1) ? "" : urls.substring(comma + 1); host.trim();
+        if (host == "") continue;
+        if (cur == idx) { serverUsed = host; break; } cur++;
+      }
+      ip = getPublicIP(idx); if (ip != "") success = true;
+    } else {
+      ip = getPublicIP(); if (ip != "") success = true;
+      String urls = String(cfg.public_ip_urls);
+      int comma = urls.indexOf(','); serverUsed = (comma == -1) ? urls : urls.substring(0, comma); serverUsed.trim();
+    }
+    JsonDocument doc; doc["ip"] = ip; doc["server"] = serverUsed; doc["success"] = success;
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
+  });
+
+  // ── NTP ──
+  addOptions("/api/ntp/config");
+  server.on("/api/ntp/config", HTTP_GET, []() {
+    sendCORS();
+    JsonDocument doc;
+    doc["ntp_server"] = cfg.ntp_server;
+    doc["tz_offset"] = cfg.tz_offset;
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
+  });
+  server.on("/api/ntp/config", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    if (server.arg("server") != "") strncpy(cfg.ntp_server, server.arg("server").c_str(), sizeof(cfg.ntp_server) - 1);
+    if (server.arg("tz_offset") != "") cfg.tz_offset = server.arg("tz_offset").toInt();
+    storageSave();
+    JsonDocument doc; doc["status"] = "saved"; doc["ntp_server"] = cfg.ntp_server; doc["tz_offset"] = cfg.tz_offset;
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
+  });
+
+  // ── GPIO (new paths, all with consistent auth) ──
+  addOptions("/api/gpio");
+  server.on("/api/gpio", []() {
+    if (!checkAuth()) return;
+    server.send(200, "application/json", gpioInfo());
+  });
+
+  addOptions("/api/gpio/read");
+  server.on("/api/gpio/read", []() {
+    if (!checkAuth()) return;
+    int pin = server.arg("pin").toInt();
+    server.send(200, "application/json", gpioRead(pin));
+  });
+
+  addOptions("/api/gpio/set");
+  server.on("/api/gpio/set", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    int pin = server.arg("pin").toInt(); String mode = server.arg("mode"); String value = server.arg("value");
+    server.send(200, "application/json", gpioSet(pin, mode, value));
+  });
+
+  addOptions("/api/gpio/blink");
+  server.on("/api/gpio/blink", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    int pin = server.arg("pin").toInt(); int times = server.arg("times").toInt();
+    int ms = server.arg("ms").toInt(); if (ms < 10 || ms > 5000) ms = 200;
+    server.send(200, "application/json", gpioBlink(pin, times, ms));
+  });
+
+  addOptions("/api/gpio/pulse");
+  server.on("/api/gpio/pulse", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    int pin = server.arg("pin").toInt(); int ms = server.arg("ms").toInt();
+    if (ms < 1 || ms > 10000) ms = 500;
+    server.send(200, "application/json", gpioPulse(pin, ms));
+  });
+
+  addOptions("/api/gpio/toggle");
+  server.on("/api/gpio/toggle", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    int pin = server.arg("pin").toInt();
+    server.send(200, "application/json", gpioToggle(pin));
+  });
+
+  addOptions("/api/gpio/analog");
+  server.on("/api/gpio/analog", HTTP_GET, []() {
+    if (!checkAuth()) return;
+    server.send(200, "application/json", analogReadPin());
+  });
+  server.on("/api/gpio/analog", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    int pin = server.arg("pin").toInt(); int value = server.arg("value").toInt();
+    server.send(200, "application/json", analogWritePin(pin, value));
+  });
+
+  addOptions("/api/gpio/config/invert");
+  server.on("/api/gpio/config/invert", HTTP_GET, []() {
+    sendCORS();
+    server.send(200, "application/json", "{\"gpio_invert\":" + String(cfg.gpio_invert) + "}");
+  });
+  server.on("/api/gpio/config/invert", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    String enabled = server.arg("enabled");
+    cfg.gpio_invert = (enabled == "1" || enabled == "true") ? 1 : 0;
+    storageSave();
+    server.send(200, "application/json", "{\"status\":\"saved\",\"gpio_invert\":" + String(cfg.gpio_invert) + "}");
+  });
+
+  addOptions("/api/gpio/config/pwm-pin");
+  server.on("/api/gpio/config/pwm-pin", HTTP_GET, []() {
+    sendCORS();
+    server.send(200, "application/json", "{\"pwm_pin\":" + String(cfg.pwm_pin) + "}");
+  });
+  server.on("/api/gpio/config/pwm-pin", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    int pin = server.arg("pin").toInt();
+    if (pin < 0 || pin > 16) { server.send(400, "application/json", "{\"error\":\"Invalid pin\"}"); return; }
+    cfg.pwm_pin = pin; storageSave();
+    server.send(200, "application/json", "{\"status\":\"saved\",\"pwm_pin\":" + String(cfg.pwm_pin) + "}");
+  });
+
+  // ── DDNS ──
+  addOptions("/api/ddns/status");
+  server.on("/api/ddns/status", []() {
+    sendCORS();
+    String r = ddnsCheck();
+    server.send(200, "application/json", r);
+  });
+
+  addOptions("/api/ddns/check");
+  server.on("/api/ddns/check", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    bool match = checkDDNS();
+    JsonDocument doc;
+    doc["match"] = match;
+    doc["public_ip"] = lastCheckedPublicIP;
+    doc["ddns_ip"] = lastCheckedDomainIP;
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
+  });
+
+  addOptions("/api/ddns/config");
+  server.on("/api/ddns/config", HTTP_GET, []() {
+    sendCORS();
+    JsonDocument doc;
+    doc["hostname"] = cfg.ddns_hostname;
+    doc["domain"] = cfg.ddns_domain;
+    doc["upd_url"] = cfg.ddns_upd_url;
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
+  });
+
+  addOptions("/api/ddns/ip-urls");
+  server.on("/api/ddns/ip-urls", HTTP_GET, []() {
+    sendCORS();
+    server.send(200, "application/json", "{\"urls\":\"" + String(cfg.public_ip_urls) + "\"}");
+  });
+  server.on("/api/ddns/ip-urls", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    String urls = server.arg("urls");
+    if (urls != "") { urls.replace("https://", ""); urls.replace("http://", ""); strncpy(cfg.public_ip_urls, urls.c_str(), sizeof(cfg.public_ip_urls) - 1); }
+    storageSave();
+    server.send(200, "application/json", "{\"status\":\"saved\",\"urls\":\"" + String(cfg.public_ip_urls) + "\"}");
+  });
+
+  addOptions("/api/ddns/led/pin");
+  server.on("/api/ddns/led/pin", HTTP_GET, []() {
+    sendCORS();
+    server.send(200, "application/json", "{\"led_pin\":" + String(cfg.led_pin) + ",\"led_on\":false}");
+  });
+  server.on("/api/ddns/led/pin", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    int pin = server.arg("pin").toInt();
+    if (pin < 0 || pin > 16) { server.send(400, "application/json", "{\"error\":\"Invalid pin\"}"); return; }
+    cfg.led_pin = pin; pinMode(cfg.led_pin, OUTPUT);
+    digitalWrite(cfg.led_pin, cfg.gpio_invert ? LOW : HIGH);
+    storageSave();
+    server.send(200, "application/json", "{\"status\":\"saved\",\"led_pin\":" + String(cfg.led_pin) + "}");
+  });
+
+  // ── TOOLS ──
+  addOptions("/api/ping");
+  server.on("/api/ping", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    String host = server.arg("host");
+    if (host == "") { server.send(400, "application/json", "{\"error\":\"Missing host\"}"); return; }
+    String result = pingHost(host);
+    server.send(200, "application/json", result);
+  });
+
+  addOptions("/api/dns/resolve");
+  server.on("/api/dns/resolve", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    String host = server.arg("host");
+    if (host == "") { server.send(400, "application/json", "{\"error\":\"Missing host\"}"); return; }
+    IPAddress ip;
+    if (WiFi.hostByName(host.c_str(), ip)) {
+      server.send(200, "application/json", "{\"host\":\"" + host + "\",\"ip\":\"" + ip.toString() + "\"}");
+    } else {
+      server.send(500, "application/json", "{\"error\":\"DNS failed\"}");
+    }
+  });
+
+  addOptions("/api/http/fetch");
+  server.on("/api/http/fetch", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    String url = server.arg("url");
+    if (url == "") { server.send(400, "application/json", "{\"error\":\"Missing url\"}"); return; }
+    if (!url.startsWith("http://") && !url.startsWith("https://")) { server.send(400, "application/json", "{\"error\":\"Invalid protocol\"}"); return; }
+    if (WiFi.status() != WL_CONNECTED) { server.send(503, "application/json", "{\"error\":\"WiFi not connected\"}"); return; }
+    HTTPClient http; int code; String payload;
+    http.setTimeout(10000);
+    http.setUserAgent("ESP-DDNS/1.0");
+    WiFiClientSecure cSecure; WiFiClient cPlain;
+    bool isHttps = url.startsWith("https://");
+    if (isHttps) { cSecure.setInsecure(); http.begin(cSecure, url); }
+    else { http.begin(cPlain, url); }
+    code = http.GET();
+    auto readPayload = [&]() {
+      WiFiClient *s = http.getStreamPtr();
+      if (!s) return;
+      int maxSize = 10240, total = 0; unsigned long timeout = millis() + 5000;
+      while (millis() < timeout && total < maxSize) {
+        if (s->available()) { payload += (char)s->read(); total++; timeout = millis() + 5000; }
+      }
+      if (total >= maxSize) payload += "\n[TRUNCATED at 10KB]";
+    };
+    if (code == HTTP_CODE_OK) { readPayload(); }
+    else if (isHttps) {
+      http.end();
+      String httpUrl = "http://" + url.substring(8);
+      http.begin(cPlain, httpUrl);
+      code = http.GET();
+      if (code == HTTP_CODE_OK) { readPayload(); }
+      else { payload = "Error (" + String(code) + "): " + http.errorToString(code); }
+    } else { payload = "Error (" + String(code) + "): " + http.errorToString(code); }
+    http.end();
+    server.send(200, "text/plain", payload);
   });
 
   server.begin();

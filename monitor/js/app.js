@@ -144,7 +144,7 @@ $('connect-form').addEventListener('submit', async (e) => {
   hideConnectError();
 
   try {
-    const info = await apiFetch('/api/info');
+    const info = await apiFetch('/api/status');
     // Connected!
     state.host = ip;
     initDashboard(info);
@@ -204,7 +204,13 @@ async function refreshAll() {
   try {
     const info = await apiFetch('/api/info');
     updateInfoCard(info);
-    loadTime();
+    const timeData = await apiFetch('/api/ntp/time');
+    if (timeData.epoch && timeData.tz_offset != null) {
+      state.deviceEpoch = timeData.epoch;
+      state.tzOffset = timeData.tz_offset;
+      state.lastTimeSync = Date.now();
+      if (state.lastUptime != null) state.bootEpoch = timeData.epoch - state.lastUptime;
+    }
     $('status-pill').classList.add('online');
     setText('status-text', 'ONLINE');
     $('device-time').classList.remove('dimmed');
@@ -243,6 +249,10 @@ function updateInfoCard(info) {
 
   // NETWORK card
   setText('info-ssid',      info.ssid        || '—');
+  setText('info-bssid',     info.bssid       || '—');
+  setText('info-channel',   info.channel     != null ? String(info.channel) : '—');
+  setText('info-phy',       info.phy_mode    || '—');
+  setText('info-txpower',   info.tx_power    != null ? String(info.tx_power) : '—');
   setText('info-rssi',      info.rssi        ? `${info.rssi} dBm` : '—');
   if (info.rssi != null) {
     const rssiPct = Math.max(0, Math.min(100, Math.round(((info.rssi + 100) / 60) * 100)));
@@ -268,6 +278,15 @@ function updateInfoCard(info) {
   setText('info-gpio-invert', info.gpio_invert ? 'YES' : 'NO');
   setText('info-led-pin',   info.led_pin != null ? `GPIO ${info.led_pin}` : '—');
   setText('info-pwm-pin',   info.pwm_pin != null ? `GPIO ${info.pwm_pin}` : '—');
+
+  // LED bulb
+  const bulb = $('led-bulb');
+  const stateLabel = $('led-state-label');
+  if (bulb && stateLabel) {
+    const isMatch = info.ddns_ip && info.public_ip && info.ddns_ip === info.public_ip;
+    bulb.className = 'led-bulb ' + (isMatch ? 'on' : 'off');
+    stateLabel.textContent = isMatch ? 'IN SYNC' : (info.ddns_ip ? 'MISMATCH' : 'UNKNOWN');
+  }
 
   // DDNS status comparison
   setText('info-ddns-ip',   info.ddns_ip     || '—');
@@ -377,11 +396,11 @@ $('btn-conn-check').addEventListener('click', async () => {
   gwEl.textContent = '⟳';
   inetEl.textContent = '⟳';
   try {
-    const info = await apiFetch('/api/info');
-    const gateway = info.gateway || '8.8.8.8';
+    const netStatus = await apiFetch('/api/network/status');
+    const gateway = netStatus.gateway || '8.8.8.8';
     const [gwRes, inetRes] = await Promise.all([
-      apiFetch(`/api/ping?host=${encodeURIComponent(gateway)}`, { auth: true }),
-      apiFetch('/api/ping?host=8.8.8.8', { auth: true })
+      apiFetch('/api/ping', { method: 'POST', auth: true, body: 'host=' + encodeURIComponent(gateway) }),
+      apiFetch('/api/ping', { method: 'POST', auth: true, body: 'host=8.8.8.8' })
     ]);
     gwEl.textContent = gwRes.success ? `✓ ${gwRes.rtt_ms}ms` : '✕ FAIL';
     inetEl.textContent = inetRes.success ? `✓ ${inetRes.rtt_ms}ms` : '✕ FAIL';
@@ -404,7 +423,7 @@ function formatTimeFromEpoch(epoch) {
 
 async function loadTime() {
   try {
-    const data = await apiFetch('/api/time');
+    const data = await apiFetch('/api/ntp/time');
     if (data.epoch && data.tz_offset != null) {
       state.deviceEpoch = data.epoch;
       state.tzOffset = data.tz_offset;
@@ -532,7 +551,7 @@ $('btn-ddns-ipurls-save').addEventListener('click', async () => {
   if (!urls) { toast('Enter at least one server URL', 'warning'); return; }
   const body = new URLSearchParams({ urls }).toString();
   try {
-    const data = await apiFetch('/api/ddns/ipurls', { method: 'POST', auth: true, body });
+    const data = await apiFetch('/api/ddns/ip-urls', { method: 'POST', auth: true, body });
     $('ddns-ipurls').value = data.public_ip_urls;
     const sel = $('ipcheck-server');
     sel.innerHTML = '';
@@ -554,7 +573,7 @@ $('btn-ipcheck').addEventListener('click', async () => {
   btn.disabled = true;
   btn.textContent = '⟳ CHECKING…';
   try {
-    const data = await apiFetch('/api/ddns/refresh-ip?idx=' + idx);
+    const data = await apiFetch('/api/network/public-ip/check', { method: 'POST', auth: true, body: 'idx=' + idx });
     const cls = data.success ? 'success' : 'error';
     const serverName = data.server || '—';
     const ipText = data.ip || 'FAILED';
@@ -592,7 +611,7 @@ $('btn-resolve').addEventListener('click', async () => {
   if (!host) { toast('Enter a hostname', 'warning'); return; }
   hideResult('resolve-result');
   try {
-    const data = await apiFetch(`/api/resolve?host=${encodeURIComponent(host)}`);
+    const data = await apiFetch('/api/dns/resolve', { method: 'POST', auth: true, body: 'host=' + encodeURIComponent(host) });
     if (data.error) {
       showResult('resolve-result', `DNS failed for: ${host}`, 'error');
     } else {
@@ -608,7 +627,7 @@ async function loadGpioInfo() {
   const grid = $('gpio-grid');
   grid.innerHTML = '<div class="gpio-loading">Loading pins…</div>';
   try {
-    const data = await apiFetch('/api/gpio/info');
+    const data = await apiFetch('/api/gpio', { auth: true });
     const pins = data.pins || [];
     grid.innerHTML = '';
     for (const p of pins) {
@@ -740,7 +759,7 @@ $('btn-led-pin').addEventListener('click', async () => {
   const pin = $('led-pin-sel').value;
   const body = new URLSearchParams({ pin }).toString();
   try {
-    const data = await apiFetch('/api/led/pin', { method: 'POST', auth: true, body });
+    const data = await apiFetch('/api/ddns/led/pin', { method: 'POST', auth: true, body });
     showResult('led-pin-result', `LED pin saved: GPIO ${data.led_pin}`, 'success');
     setText('led-pin-display', data.led_pin);
     toast(`LED pin set to GPIO ${data.led_pin}`, 'success');
@@ -753,7 +772,7 @@ $('btn-led-pin').addEventListener('click', async () => {
 // ── GPIO Invert ─────────────────────────────────────────────
 async function loadGpioInvert() {
   try {
-    const info = await apiFetch('/api/info');
+    const info = await apiFetch('/api/gpio/config/invert');
     updateLedInvertUI(info.gpio_invert === 1);
   } catch {}
 }
@@ -767,7 +786,7 @@ $('gpio-invert-toggle')?.addEventListener('click', async () => {
   const enabled = $('gpio-invert-toggle').classList.contains('active') ? 0 : 1;
   const body = new URLSearchParams({ enabled }).toString();
   try {
-    await apiFetch('/api/gpio/invert', { method: 'POST', auth: true, body });
+    await apiFetch('/api/gpio/config/invert', { method: 'POST', auth: true, body });
     updateLedInvertUI(enabled === 1);
     toast(`GPIO invert ${enabled ? 'ON' : 'OFF'}`, 'success');
   } catch (err) {
@@ -778,7 +797,7 @@ $('gpio-invert-toggle')?.addEventListener('click', async () => {
 // ── Analog (A0 / PWM) ──────────────────────────────────────
 $('btn-analog-read').addEventListener('click', async () => {
   try {
-    const data = await apiFetch('/api/gpio/analog/read');
+    const data = await apiFetch('/api/gpio/analog', { auth: true });
     setText('analog-read-value', data.value != null ? data.value : data.raw);
     toast(`A0: ${data.value} / 100`, 'success');
   } catch (err) {
@@ -814,7 +833,7 @@ $('btn-ntp-save').addEventListener('click', async () => {
   if (server) body.append('server', server);
   if (tz_offset) body.append('tz_offset', tz_offset);
   try {
-    const data = await apiFetch('/api/ntp/set', { method: 'POST', auth: true, body: body.toString() });
+    const data = await apiFetch('/api/ntp/config', { method: 'POST', auth: true, body: body.toString() });
     showResult('ntp-result', `NTP: ${data.ntp_server}, TZ: ${data.tz_offset}s (UTC${data.tz_offset / 3600 >= 0 ? '+' : ''}${data.tz_offset / 3600}h)`, 'success');
     toast('NTP config saved', 'success');
   } catch (err) {
@@ -835,7 +854,7 @@ $('btn-wifi-scan').addEventListener('click', async () => {
   resultsEl.innerHTML = '';
 
   try {
-    const data = await apiFetch('/api/wifi/scan', { auth: true });
+    const data = await apiFetch('/api/network/wifi/scan', { auth: true });
     if (data.status === 'scanning') {
       statusEl.textContent = 'Scan in progress, polling...';
       if (scanPollInterval) clearInterval(scanPollInterval);
@@ -851,7 +870,7 @@ $('btn-wifi-scan').addEventListener('click', async () => {
 
 async function pollScan() {
   try {
-    const data = await apiFetch('/api/wifi/scan', { auth: true });
+    const data = await apiFetch('/api/network/wifi/scan', { auth: true });
     if (data.networks) {
       clearInterval(scanPollInterval);
       scanPollInterval = null;
@@ -923,7 +942,7 @@ $('btn-ip-save').addEventListener('click', async () => {
     body.append('subnet',  $('ip-subnet').value.trim());
   }
   try {
-    const data = await apiFetch('/api/ip/config', { method: 'POST', auth: true, body: body.toString() });
+    const data = await apiFetch('/api/network/ip/config', { method: 'POST', auth: true, body: body.toString() });
     showResult('ip-result', `IP config saved: ${data.use_static_ip ? 'STATIC' : 'DHCP'}. Reconnect to apply.`, 'success');
     toast('IP config saved', 'success');
   } catch (err) {
@@ -938,7 +957,7 @@ $('btn-mdns-save').addEventListener('click', async () => {
   if (!mdns) { toast('Enter an mDNS name', 'warning'); return; }
   const body = new URLSearchParams({ mdns }).toString();
   try {
-    const data = await apiFetch('/api/set/mdns', { method: 'POST', auth: true, body });
+    const data = await apiFetch('/api/network/mdns', { method: 'POST', auth: true, body });
     showResult('mdns-result', `mDNS saved: "${data.mdns}". Reboot to apply.`, 'success');
     toast('mDNS saved', 'success');
   } catch (err) {
@@ -970,7 +989,7 @@ $('btn-dns-save').addEventListener('click', async () => {
   if (dns1) body.append('dns1', dns1);
   if (dns2) body.append('dns2', dns2);
   try {
-    const data = await apiFetch('/api/dns/set', { method: 'POST', auth: true, body: body.toString() });
+    const data = await apiFetch('/api/network/dns/config', { method: 'POST', auth: true, body: body.toString() });
     showResult('dns-result', `DNS saved: ${data.dns1}, ${data.dns2}. Applied ${data.use_custom_dns ? 'custom' : 'DHCP'} DNS.`, 'success');
     updateDnsToggleUI(data.use_custom_dns === 1);
     toast('DNS saved', 'success');
@@ -986,7 +1005,7 @@ $('btn-save-ssid').addEventListener('click', async () => {
   if (!ssid) { toast('Enter an SSID', 'warning'); return; }
   const body = new URLSearchParams({ ssid }).toString();
   try {
-    const data = await apiFetch('/api/set/ssid', { method: 'POST', auth: true, body });
+    const data = await apiFetch('/api/network/wifi/ssid', { method: 'POST', auth: true, body });
     showResult('wifi-result', `SSID saved: "${ssid}". Device will reconnect.`, 'success');
     toast('SSID saved', 'success');
   } catch (err) {
@@ -998,9 +1017,9 @@ $('btn-save-ssid').addEventListener('click', async () => {
 $('btn-save-pswd').addEventListener('click', async () => {
   const pswd = $('wifi-pswd').value;
   if (!pswd) { toast('Enter a password', 'warning'); return; }
-  const body = new URLSearchParams({ pswd }).toString();
+  const body = new URLSearchParams({ password: pswd }).toString();
   try {
-    const data = await apiFetch('/api/set/pswd', { method: 'POST', auth: true, body });
+    const data = await apiFetch('/api/network/wifi/password', { method: 'POST', auth: true, body });
     showResult('wifi-result', 'WiFi password saved.', 'success');
     toast('Password saved', 'success');
   } catch (err) {
@@ -1015,7 +1034,7 @@ $('btn-ping').addEventListener('click', async () => {
   if (!host) { toast('Enter a host or IP', 'warning'); return; }
   hideResult('ping-result');
   try {
-    const data = await apiFetch(`/api/ping?host=${encodeURIComponent(host)}`, { auth: true });
+    const data = await apiFetch('/api/ping', { method: 'POST', auth: true, body: 'host=' + encodeURIComponent(host) });
     if (data.success) {
       showResult('ping-result', `${data.host} is alive — ${data.rtt_ms}ms avg`, 'success');
     } else {
@@ -1036,7 +1055,7 @@ $('btn-curl').addEventListener('click', async () => {
   result.classList.remove('hidden');
 
   try {
-    const data = await apiFetch(`/api/curl?url=${encodeURIComponent(url)}`, { auth: true });
+    const data = await apiFetch('/api/http/fetch', { method: 'POST', auth: true, body: 'url=' + encodeURIComponent(url) });
     result.textContent = data;
     toast('Fetch complete', 'success');
   } catch (err) {
@@ -1049,21 +1068,18 @@ $('btn-curl').addEventListener('click', async () => {
 let _apiEndpoints = [];
 let _selectedEp = null;
 
-const API_GROUPS = ['GENERAL','DDNS','GPIO','LED','SYSTEM','CONFIG','SETTINGS','NTP','WIFI','DNS','IP','PWM'];
+const API_GROUPS = ['SYSTEM','NETWORK','NTP','GPIO','DDNS','TOOLS','CONFIG'];
 
 function getApiGroup(path) {
-  if (path.startsWith('/api/ddns/')) return 'DDNS';
-  if (path.startsWith('/api/gpio/')) return 'GPIO';
-  if (path.startsWith('/api/led/')) return 'LED';
   if (path.startsWith('/api/system/')) return 'SYSTEM';
-  if (path.startsWith('/api/config/')) return 'CONFIG';
-  if (path.startsWith('/api/set/')) return 'SETTINGS';
+  if (path.startsWith('/api/network/')) return 'NETWORK';
   if (path.startsWith('/api/ntp/')) return 'NTP';
-  if (path.startsWith('/api/wifi/')) return 'WIFI';
-  if (path.startsWith('/api/dns/')) return 'DNS';
-  if (path.startsWith('/api/ip/')) return 'IP';
-  if (path.startsWith('/api/pwm/')) return 'PWM';
-  return 'GENERAL';
+  if (path.startsWith('/api/gpio/')) return 'GPIO';
+  if (path.startsWith('/api/ddns/')) return 'DDNS';
+  if (path.startsWith('/api/ping') || path.startsWith('/api/dns/') || path.startsWith('/api/http/')) return 'TOOLS';
+  if (path.startsWith('/api/config/')) return 'CONFIG';
+  if (path.startsWith('/api/status') || path.startsWith('/api/help')) return 'SYSTEM';
+  return 'SYSTEM';
 }
 
 $('btn-api-refresh').addEventListener('click', loadApiExplorer);
@@ -1287,7 +1303,7 @@ async function loadLog() {
   const container = $('log-container');
   container.innerHTML = '<div class="log-empty">Loading…</div>';
   try {
-    const data = await apiFetch('/api/log', { auth: true });
+    const data = await apiFetch('/api/system/log', { auth: true });
     const entries = Array.isArray(data) ? data : [];
     setText('log-count', `${entries.length} entries`);
     if (!entries.length) {

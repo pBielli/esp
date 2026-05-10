@@ -31,15 +31,10 @@ void setup() {
   pinMode(cfg.led_pin, OUTPUT);
   digitalWrite(cfg.led_pin, cfg.gpio_invert ? LOW : HIGH);
 
+  WiFi.setAutoReconnect(true);
+  WiFi.persistent(false);
   WiFi.begin(cfg.wifi_ssid, cfg.wifi_password);
   logPrint("WIFI", "Connecting to " + String(cfg.wifi_ssid));
-  int wifiTimeout = 40;
-  while (WiFi.status() != WL_CONNECTED && wifiTimeout > 0) { delay(500); Serial.print("."); wifiTimeout--; }
-  if (WiFi.status() == WL_CONNECTED) {
-    logPrint("WIFI", "Connected: " + WiFi.localIP().toString());
-  } else {
-    Serial.println(" FAILED (will retry in loop)");
-  }
 
   applyNetworkConfig();
   validateNetworkConfig();
@@ -59,51 +54,20 @@ void setup() {
 void loop() {
   server.handleClient();
 
-  if (WiFi.status() != WL_CONNECTED) {
-    static unsigned long lastWifiRetry = 0;
-    if (millis() - lastWifiRetry > 30000) {
-      lastWifiRetry = millis();
-      logPrint("WIFI", "Reconnecting to " + String(cfg.wifi_ssid));
-      WiFi.begin(cfg.wifi_ssid, cfg.wifi_password);
-      int wifiTimeout = 20;
-      while (WiFi.status() != WL_CONNECTED && wifiTimeout > 0) { delay(500); Serial.print("."); wifiTimeout--; }
-        Serial.println("");
-      if (WiFi.status() == WL_CONNECTED) {
-        logPrint("WIFI", "Reconnected: " + WiFi.localIP().toString());
-        if (cfg.use_static_ip) {
-          IPAddress ip, gw, subnet, dns1, dns2;
-          ip.fromString(cfg.static_ip);
-          gw.fromString(cfg.static_gateway);
-          subnet.fromString(cfg.static_subnet);
-          dns1.fromString(cfg.static_dns1);
-          dns2.fromString(cfg.static_dns2);
-          WiFi.config(ip, gw, subnet, dns1, dns2);
-        } else if (cfg.use_custom_dns) {
-          String ipStr = WiFi.localIP().toString();
-          String gwStr = WiFi.gatewayIP().toString();
-          String subnetStr = WiFi.subnetMask().toString();
-          strncpy(cfg.static_ip, ipStr.c_str(), sizeof(cfg.static_ip) - 1);
-          strncpy(cfg.static_gateway, gwStr.c_str(), sizeof(cfg.static_gateway) - 1);
-          strncpy(cfg.static_subnet, subnetStr.c_str(), sizeof(cfg.static_subnet) - 1);
-          storageSave();
-          IPAddress ip, gw, subnet, dns1, dns2;
-          ip.fromString(cfg.static_ip);
-          gw.fromString(cfg.static_gateway);
-          subnet.fromString(cfg.static_subnet);
-          dns1.fromString(cfg.static_dns1);
-          dns2.fromString(cfg.static_dns2);
-          WiFi.config(ip, gw, subnet, dns1, dns2);
-          logPrint("DNS", "Custom DNS: " + String(cfg.static_ip) + " / " + String(cfg.static_dns1) + ", " + String(cfg.static_dns2));
-        }
-        validateNetworkConfig();
-      }
-    }
+  static bool wifiWasConnected = false;
+  if (WiFi.status() == WL_CONNECTED && !wifiWasConnected) {
+    wifiWasConnected = true;
+    logPrint("WIFI", "Connected: " + WiFi.localIP().toString());
+    applyNetworkConfig();
+    validateNetworkConfig();
+  } else if (WiFi.status() != WL_CONNECTED) {
+    wifiWasConnected = false;
   }
 
   if (millis() - lastCheck > (unsigned long)cfg.ddns_check_interval * 1000 || flag_firtstRun) {
     if(flag_firtstRun)
       flag_firtstRun = false;
-    checkDDNS();
+    if (WiFi.status() == WL_CONNECTED) checkDDNS();
     lastCheck = millis();
   }
 }

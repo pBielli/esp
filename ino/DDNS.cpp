@@ -149,9 +149,11 @@ bool checkDDNS() {
   bool flag=false;
   if (ddns != "" && pub != "") {
     if (ddns != pub) {
-      logPrint("DDNS", "Mismatch detected: DDNS=" + ddns + " Public=" + pub);
-      lastCheckMatch = false;
-      ledOn();
+      logPrint("DDNS", "Mismatch: DDNS=" + ddns + " Public=" + pub + " — auto-updating");
+      String resp = updateDDNS(pub);
+      lastCheckMatch = true;
+      ledOff();
+      flag=true;
     } else {
       logPrint("DDNS", "Match OK: " + ddns);
       lastCheckMatch = true;

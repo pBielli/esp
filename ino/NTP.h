@@ -3,9 +3,7 @@
 
 #include <Arduino.h>
 #include <time.h>
-#include <WiFiUdp.h>
 
-extern WiFiUDP ntpUdp;
 extern unsigned long lastNtpSync;
 extern const unsigned long ntpSyncInterval;
 

@@ -1,6 +1,13 @@
 #include "GPIO.h"
 #include "Config.h"
 
+static void yieldDelay(int ms) {
+  for (int w = 0; w < ms; w += 10) {
+    delay(min(10, ms - w));
+    yield();
+  }
+}
+
 String gpioSet(int pin, String mode, String value) {
   if (pin < 0 || pin > 16) return "{\"error\":\"Invalid pin\"}";
   if (mode == "input") {
@@ -45,9 +52,9 @@ String gpioBlink(int pin, int times, int ms) {
   bool invert = cfg.gpio_invert == 1;
   for (int i = 0; i < times; i++) {
     digitalWrite(pin, invert ? LOW : HIGH);
-    delay(ms);
+    yieldDelay(ms);
     digitalWrite(pin, invert ? HIGH : LOW);
-    delay(ms);
+    yieldDelay(ms);
   }
   char buf[96];
   snprintf(buf, sizeof(buf), "{\"pin\":%d,\"blinked\":%d,\"ms\":%d}", pin, times, ms);
@@ -64,7 +71,7 @@ void ledOff() {
 
 String analogReadPin() {
   int val = analogRead(A0);
-  float voltage = val * (3.3f / 1024.0f);
+  float voltage = val * (1.0f / 1024.0f);
   int mapped = map(val, 0, 1023, 0, 100);
   char buf[96];
   snprintf(buf, sizeof(buf), "{\"pin\":\"A0\",\"raw\":%d,\"voltage\":%.2f,\"value\":%d}", val, voltage, mapped);
@@ -85,9 +92,9 @@ String analogWritePin(int pin, int value) {
 void ledBlink(int times) {
   for (int i = 0; i < times; i++) {
     ledOn();
-    delay(200);
+    yieldDelay(200);
     ledOff();
-    delay(200);
+    yieldDelay(200);
   }
   ledOff();
 }
@@ -97,7 +104,7 @@ String gpioPulse(int pin, int ms) {
   pinMode(pin, OUTPUT);
   bool invert = cfg.gpio_invert == 1;
   digitalWrite(pin, invert ? LOW : HIGH);
-  delay(ms);
+  yieldDelay(ms);
   digitalWrite(pin, invert ? HIGH : LOW);
   return "{\"pin\":" + String(pin) + ",\"pulse_ms\":" + String(ms) + "}";
 }
