@@ -164,6 +164,8 @@ void setupRoutes() {
     add("/api/wifi/networks",       "DELETE",true, {"index"});
     add("/api/wifi/networks/reorder","POST", true,  {"from","to"});
     add("/api/wifi/connect",        "POST", true,  {"index"});
+    add("/api/wifi/retry",          "GET",  false, {});
+    add("/api/wifi/retry",          "POST", true,  {"count"});
     add("/api/wifi/ap",             "GET",  false, {});
     add("/api/wifi/ap",             "POST", true,  {"enabled","ssid","password","ap_fallback"});
     String r; serializeJson(doc, r);
@@ -209,6 +211,7 @@ void setupRoutes() {
     doc["firmware"] = FIRMWARE_VERSION;
     doc["ap_ssid"] = cfg.ap_ssid;
     doc["ap_fallback"] = cfg.ap_fallback;
+    doc["wifi_retry_count"] = cfg.wifi_retry_count;
     doc["ota_url"] = cfg.ota_url;
     doc["ota_check_interval"] = cfg.ota_check_interval;
     doc["last_check_elapsed_ms"] = (long)(lastCheckTime > 0 ? millis() - lastCheckTime : -1);
@@ -302,6 +305,7 @@ void setupRoutes() {
     doc["public_ip_urls"] = cfg.public_ip_urls;
     doc["ap_ssid"] = cfg.ap_ssid;
     doc["ap_fallback"] = cfg.ap_fallback;
+    doc["wifi_retry_count"] = cfg.wifi_retry_count;
     doc["ota_url"] = cfg.ota_url;
     doc["ota_check_interval"] = cfg.ota_check_interval;
     String r; serializeJson(doc, r);
@@ -344,6 +348,7 @@ void setupRoutes() {
     setInt("ddns_check_interval", cfg.ddns_check_interval);
     setStr("ddns_upd_url", cfg.ddns_upd_url, sizeof(cfg.ddns_upd_url));
     setStr("public_ip_urls", cfg.public_ip_urls, sizeof(cfg.public_ip_urls));
+    setInt("wifi_retry_count", cfg.wifi_retry_count);
     storageSave();
     server.send(200, "application/json", "{\"status\":\"imported\"}");
   });
@@ -903,8 +908,17 @@ void setupRoutes() {
     }
     WiFi.disconnect();
     delay(100);
-    WiFi.begin(net.ssid, net.password);
-    server.send(200, "application/json", "{\"status\":\"connecting\",\"ssid\":\"" + String(net.ssid) + "\"}");
+    int retries = cfg.wifi_retry_count > 0 ? cfg.wifi_retry_count : 1;
+    bool connected = false;
+    for (int t = 0; t < retries; t++) {
+      WiFi.begin(net.ssid, net.password);
+      for (int w = 0; w < 50; w++) {
+        if (WiFi.status() == WL_CONNECTED) { connected = true; break; }
+        delay(200);
+      }
+      if (connected) break;
+    }
+    server.send(200, "application/json", "{\"status\":\"" + String(connected ? "connected" : "connecting") + "\",\"ssid\":\"" + String(net.ssid) + "\"}");
   });
 
   // ── WIFI AP ──
@@ -946,6 +960,24 @@ void setupRoutes() {
       wifiAPStart();
     }
     server.send(200, "application/json", "{\"status\":\"ap_config_saved\"}");
+  });
+
+  // ── WIFI RETRY ──
+  addOptions("/api/wifi/retry");
+  server.on("/api/wifi/retry", HTTP_GET, []() {
+    sendCORS();
+    DynamicJsonDocument doc(128);
+    doc["wifi_retry_count"] = cfg.wifi_retry_count;
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
+  });
+  server.on("/api/wifi/retry", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    int count = server.arg("count").toInt();
+    if (count < 1 || count > 10) { server.send(400, "application/json", "{\"error\":\"Count must be 1-10\"}"); return; }
+    cfg.wifi_retry_count = count;
+    storageSave();
+    server.send(200, "application/json", "{\"status\":\"saved\",\"wifi_retry_count\":" + String(cfg.wifi_retry_count) + "}");
   });
 
   // ── SYSTEM OTA ──

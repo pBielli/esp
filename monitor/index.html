@@ -566,6 +566,17 @@
                 <button class="btn-action btn-primary" id="btn-save-ssid">SAVE SSID</button>
                 <button class="btn-action btn-primary" id="btn-save-pswd">SAVE PASSWORD</button>
               </div>
+              <hr class="form-divider">
+              <div class="form-row">
+                <div class="form-field">
+                  <label class="field-label">RETRY COUNT (per AP)</label>
+                  <div class="field-row">
+                    <span class="field-prefix">⟳</span>
+                    <input type="number" class="field-input" id="wifi-retry-count" placeholder="2" min="1" max="10" />
+                    <button class="card-action-btn" id="btn-retry-save">SAVE</button>
+                  </div>
+                </div>
+              </div>
               <div class="action-result hidden" id="wifi-result"></div>
             </div>
           </div>

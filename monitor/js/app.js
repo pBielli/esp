@@ -1039,6 +1039,20 @@ $('btn-save-pswd').addEventListener('click', async () => {
   }
 });
 
+$('btn-retry-save').addEventListener('click', async () => {
+  const count = parseInt($('wifi-retry-count').value);
+  if (isNaN(count) || count < 1 || count > 10) { toast('Count must be 1–10', 'warning'); return; }
+  const body = new URLSearchParams({ count }).toString();
+  try {
+    const data = await apiFetch('/api/wifi/retry', { method: 'POST', auth: true, body });
+    showResult('wifi-result', `Retry count saved: ${data.wifi_retry_count}`, 'success');
+    toast('Retry count saved', 'success');
+  } catch (err) {
+    showResult('wifi-result', `Error: ${err.message}`, 'error');
+    toast('Retry save failed', 'error');
+  }
+});
+
 // ── PING ─────────────────────────────────────────────────
 $('btn-ping').addEventListener('click', async () => {
   const host = $('ping-host').value.trim();
@@ -1357,6 +1371,7 @@ async function loadNetworkTab() {
     if (info.static_ip) $('ip-addr').value = info.static_ip;
     if (info.static_gateway) $('ip-gateway').value = info.static_gateway;
     if (info.static_subnet) $('ip-subnet').value = info.static_subnet;
+    if (info.wifi_retry_count != null) $('wifi-retry-count').value = info.wifi_retry_count;
 
   } catch {}
   loadSavedNetworks();

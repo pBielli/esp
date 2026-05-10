@@ -27,7 +27,7 @@ void setup() {
   storageBegin();
   storageLoad();
   networkListLoad();
-storageReset();
+// storageReset();
   if (!storageInitialized()) {
     storageReset();
     networkListSave();

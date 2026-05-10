@@ -51,6 +51,7 @@ struct Config {
   int ap_fallback;
   char ota_url[256];
   int ota_check_interval;
+  int wifi_retry_count;
   char magic[4];
 };
 
