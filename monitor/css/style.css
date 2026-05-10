@@ -1309,6 +1309,14 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--border); }
 ::-webkit-scrollbar-thumb:hover { background: var(--green-dim); }
 
+/* ── Saved Networks ── */
+#networks-list .scan-table td:last-child { white-space: nowrap; }
+#networks-list .scan-table button { margin: 0 0.15rem; }
+
+/* ── AP fields ── */
+#ap-fields { margin-top: 0.5rem; }
+#ap-fields .form-row { margin-bottom: 0.5rem; }
+
 /* ── Responsive ── */
 @media (max-width: 600px) {
   .tab-content { padding: 0.7rem; }

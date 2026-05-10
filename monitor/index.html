@@ -168,7 +168,6 @@
               <div class="info-item"><span class="info-label">BSSID</span><span class="info-val" id="info-bssid">—</span></div>
               <div class="info-item"><span class="info-label">CHANNEL</span><span class="info-val" id="info-channel">—</span></div>
               <div class="info-item"><span class="info-label">PHY</span><span class="info-val" id="info-phy">—</span></div>
-              <div class="info-item"><span class="info-label">TX POWER</span><span class="info-val" id="info-txpower">—</span></div>
               <div class="info-item"><span class="info-label">mDNS</span><span class="info-val" id="info-mdns">—</span></div>
             </div>
           </div>
@@ -576,6 +575,102 @@
           </div>
         </div>
 
+        <div class="card card--wide">
+          <div class="card-header">
+            <span class="card-icon">⌖</span>
+            <span class="card-title">ACCESS POINT</span>
+          </div>
+          <div class="action-block">
+            <div class="form-row">
+              <div class="form-field">
+                <label class="toggle-label">
+                  <span class="toggle-text">AP</span>
+                  <span class="toggle-switch" id="ap-toggle">
+                    <span class="toggle-slider"></span>
+                  </span>
+                  <span class="toggle-text" id="ap-toggle-label">OFF</span>
+                </label>
+              </div>
+            </div>
+            <div id="ap-fields" class="hidden">
+              <div class="form-row">
+                <div class="form-field">
+                  <label class="field-label">AP SSID</label>
+                  <div class="field-row">
+                    <span class="field-prefix">⌖</span>
+                    <input type="text" class="field-input" id="ap-ssid" placeholder="ESP-XXXX" />
+                  </div>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-field">
+                  <label class="field-label">AP PASSWORD (vuoto = aperto)</label>
+                  <div class="field-row">
+                    <span class="field-prefix">##</span>
+                    <input type="password" class="field-input" id="ap-password" placeholder="(aperto)" />
+                  </div>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-field">
+                  <label class="toggle-label">
+                    <span class="toggle-text">AUTO AP (se WiFi cade)</span>
+                    <span class="toggle-switch" id="ap-fallback-toggle">
+                      <span class="toggle-slider"></span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+              <div class="form-row">
+                <button class="btn-action btn-primary" id="btn-ap-save">SAVE AP CONFIG</button>
+                <button class="btn-action btn-secondary" id="btn-ap-toggle">START AP</button>
+              </div>
+              <div class="form-row">
+                <div class="info-item"><span class="info-label">AP IP</span><span class="info-val" id="ap-ip">—</span></div>
+                <div class="info-item"><span class="info-label">CLIENTS</span><span class="info-val" id="ap-clients">0</span></div>
+              </div>
+            </div>
+            <div class="action-result hidden" id="ap-result"></div>
+          </div>
+        </div>
+
+        <div class="card card--wide">
+          <div class="card-header">
+            <span class="card-icon">⌁</span>
+            <span class="card-title">SAVED NETWORKS</span>
+            <button class="card-action-btn" id="btn-networks-refresh">REFRESH</button>
+          </div>
+          <div class="action-block">
+            <div id="networks-list">
+              <div class="scan-status">Click REFRESH to load saved networks.</div>
+            </div>
+            <hr class="form-divider">
+            <div class="form-row">
+              <div class="form-field">
+                <label class="field-label">ADD NETWORK — SSID</label>
+                <div class="field-row">
+                  <span class="field-prefix">⌁</span>
+                  <input type="text" class="field-input" id="network-add-ssid" placeholder="SSID" />
+                </div>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-field">
+                <label class="field-label">PASSWORD</label>
+                <div class="field-row">
+                  <span class="field-prefix">##</span>
+                  <input type="password" class="field-input" id="network-add-pswd" placeholder="Password" />
+                </div>
+              </div>
+            </div>
+            <div class="form-row">
+              <button class="btn-action btn-primary" id="btn-network-add">ADD NETWORK</button>
+              <button class="btn-action btn-primary" id="btn-network-connect">CONNECT NOW</button>
+            </div>
+            <div class="action-result hidden" id="network-result"></div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -750,6 +845,42 @@
           <p class="action-desc">Reset ALL settings to factory defaults and reboot. This cannot be undone.</p>
           <button class="btn-action btn-primary" id="btn-factory-reset">⚠ FACTORY RESET</button>
           <div class="action-result hidden" id="factory-reset-result"></div>
+        </div>
+      </div>
+
+      <div class="card card--wide">
+        <div class="card-header">
+          <span class="card-icon">⌁</span>
+          <span class="card-title">OTA FIRMWARE UPDATE</span>
+        </div>
+        <div class="action-block">
+          <div class="form-row">
+            <div class="form-field">
+              <label class="field-label">OTA URL (firmware .bin or JSON metadata)</label>
+              <div class="field-row">
+                <span class="field-prefix">⌁</span>
+                <input type="text" class="field-input" id="ota-url" placeholder="https://example.com/firmware.bin" />
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label class="field-label">CHECK INTERVAL (seconds, 0 = disabled)</label>
+              <div class="field-row">
+                <span class="field-prefix">◷</span>
+                <input type="number" class="field-input" id="ota-interval" placeholder="0" min="0" />
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <button class="btn-action btn-primary" id="btn-ota-save">SAVE OTA CONFIG</button>
+            <button class="btn-action btn-primary" id="btn-ota-check">CHECK FOR UPDATE</button>
+          </div>
+          <div class="form-row">
+            <div class="info-item"><span class="info-label">CURRENT FW</span><span class="info-val" id="ota-current-version">—</span></div>
+            <div class="info-item"><span class="info-label">LAST CHECK</span><span class="info-val" id="ota-last-check">—</span></div>
+          </div>
+          <div class="action-result hidden" id="ota-result"></div>
         </div>
       </div>
 

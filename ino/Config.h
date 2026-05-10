@@ -9,6 +9,20 @@
 #define CORS_ORIGIN "https://pbielli.github.io"
 #define FIRMWARE_VERSION "1.0.0"
 
+#define MAX_NETWORKS 4
+#define NETWORK_LIST_OFFSET 1536
+
+struct WifiNetwork {
+  char ssid[33];
+  char password[65];
+};
+
+struct NetworkList {
+  char magic[5];
+  int count;
+  WifiNetwork networks[MAX_NETWORKS];
+};
+
 struct Config {
   char wifi_ssid[32];
   char wifi_password[64];
@@ -32,6 +46,11 @@ struct Config {
   int ddns_check_interval;
   char ddns_upd_url[256];
   char public_ip_urls[512];
+  char ap_ssid[32];
+  char ap_password[32];
+  int ap_fallback;
+  char ota_url[256];
+  int ota_check_interval;
   char magic[4];
 };
 
@@ -44,5 +63,14 @@ void storageReset();
 bool storageInitialized();
 void applyNetworkConfig();
 bool validateNetworkConfig();
+
+void networkListLoad();
+void networkListSave();
+int networkListTryConnect();
+int networkListCount();
+bool networkListGet(int idx, WifiNetwork &net);
+bool networkListAdd(const char *ssid, const char *password);
+bool networkListRemove(int idx);
+bool networkListMove(int from, int to);
 
 #endif

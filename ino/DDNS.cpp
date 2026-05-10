@@ -150,10 +150,11 @@ bool checkDDNS() {
   if (ddns != "" && pub != "") {
     if (ddns != pub) {
       logPrint("DDNS", "Mismatch: DDNS=" + ddns + " Public=" + pub + " — auto-updating");
-      String resp = updateDDNS(pub);
-      lastCheckMatch = true;
+      updateDDNS(pub);
+      String newDdns = getDDNSIP();
+      lastCheckMatch = (newDdns == pub && newDdns != "");
       ledOff();
-      flag=true;
+      flag = lastCheckMatch;
     } else {
       logPrint("DDNS", "Match OK: " + ddns);
       lastCheckMatch = true;
@@ -178,20 +179,11 @@ String ddnsCheck() {
   int comma = urls.indexOf(',');
   String firstServer = (comma == -1) ? urls : urls.substring(0, comma);
   firstServer.trim();
-  JsonDocument doc;
+  DynamicJsonDocument doc(512);
   doc["public_ip"] = pub;
   doc["ddns_ip"] = ddns;
   doc["match"] = match;
   doc["server"] = firstServer;
   String r; serializeJson(doc, r);
   return r;
-}
-bool checkAndUpdateDDNS() {
-  bool flag = checkDDNS();
-  if (!flag) {
-    String resp = updateDDNS(_cachedPublicIP);
-    flag=resp.indexOf("KO") == -1;
-    logPrint("DDNS", "Update " + String(cfg.ddns_hostname) + " - Match:" + (flag ? "True" : "False") + " - Resp: " + resp);
-  }
-  return flag;
 }

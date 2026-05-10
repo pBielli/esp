@@ -230,7 +230,7 @@ $('btn-refresh').addEventListener('click', refreshAll);
 // ── Info ───────────────────────────────────────────────────
 function updateInfoCard(info) {
   // SYSTEM card
-  setText('info-fw-version', info.firmware || '—');
+    setText('info-fw-version', info.firmware || info.version || '—');
   setText('info-mac',       info.mac         || '—');
   if (info.uptime) {
     state.lastUptime = info.uptime;
@@ -252,7 +252,6 @@ function updateInfoCard(info) {
   setText('info-bssid',     info.bssid       || '—');
   setText('info-channel',   info.channel     != null ? String(info.channel) : '—');
   setText('info-phy',       info.phy_mode    || '—');
-  setText('info-txpower',   info.tx_power    != null ? String(info.tx_power) : '—');
   setText('info-rssi',      info.rssi        ? `${info.rssi} dBm` : '—');
   if (info.rssi != null) {
     const rssiPct = Math.max(0, Math.min(100, Math.round(((info.rssi + 100) / 60) * 100)));
@@ -289,7 +288,7 @@ function updateInfoCard(info) {
   }
 
   // DDNS status comparison
-  setText('info-ddns-ip',   info.ddns_ip     || '—');
+  setText('ddns-domain-ip', info.ddns_ip     || '—');
   setText('info-ddns-host', info.ddns        || '—');
   if (info.ddns_ip && info.public_ip) {
     updateDdnsStatus(info.ddns_ip, info.public_ip);
@@ -299,8 +298,8 @@ function updateInfoCard(info) {
     setText('ddns-state', 'UNKNOWN');
   }
   // Last DDNS check info
-  if (info.last_check_time != null && info.last_check_time >= 0) {
-    const secs = Math.floor(info.last_check_time / 1000);
+  if (info.last_check_elapsed_ms != null && info.last_check_elapsed_ms >= 0) {
+    const secs = Math.floor(info.last_check_elapsed_ms / 1000);
     setText('ddns-last-check', formatUptime(secs) + ' ago');
   } else {
     setText('ddns-last-check', '—');
@@ -470,6 +469,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (btn.dataset.tab === 'log') loadLog();
     if (btn.dataset.tab === 'ddns') { loadDdnsConfig(); }
     if (btn.dataset.tab === 'network') loadNetworkTab();
+    if (btn.dataset.tab === 'system') loadOtaConfig();
     if (btn.dataset.tab === 'api') loadApiExplorer();
   });
 });
@@ -552,13 +552,14 @@ $('btn-ddns-ipurls-save').addEventListener('click', async () => {
   const body = new URLSearchParams({ urls }).toString();
   try {
     const data = await apiFetch('/api/ddns/ip-urls', { method: 'POST', auth: true, body });
-    $('ddns-ipurls').value = data.public_ip_urls;
+    const urls = data.urls || data.public_ip_urls || '';
+    $('ddns-ipurls').value = urls;
     const sel = $('ipcheck-server');
     sel.innerHTML = '';
-    (data.public_ip_urls || '').split(',').forEach((url, i) => {
+    urls.split(',').forEach((url, i) => {
       sel.options[i] = new Option(url || `Server ${i+1}`, i);
     });
-    showResult('ddns-ipurls-result', `IP URLs saved: ${data.public_ip_urls}`, 'success');
+    showResult('ddns-ipurls-result', `IP URLs saved: ${urls}`, 'success');
     toast('IP URLs saved', 'success');
   } catch (err) {
     showResult('ddns-ipurls-result', `Error: ${err.message}`, 'error');
@@ -673,7 +674,7 @@ $('gpio-live-toggle').addEventListener('click', () => {
 async function readGpioPin(pin) {
   try {
     const p = pin !== undefined ? pin : parseInt($('gpio-pin-sel').value);
-    const data = await apiFetch(`/api/gpio/read?pin=${p}`);
+    const data = await apiFetch(`/api/gpio/read?pin=${p}`, { auth: true });
     showResult('gpio-result', `GPIO ${data.pin}: ${data.value === 1 ? 'HIGH (1)' : 'LOW (0)'}`, 'success');
   } catch (err) {
     showResult('gpio-result', `Error: ${err.message}`, 'error');
@@ -724,7 +725,7 @@ $('btn-gpio-toggle').addEventListener('click', async () => {
   const body = new URLSearchParams({ pin }).toString();
   try {
     const data = await apiFetch('/api/gpio/toggle', { method: 'POST', auth: true, body });
-    showResult('gpio-result', `GPIO ${data.pin} toggled → ${data.value === 1 ? 'HIGH' : 'LOW'}`, 'success');
+    showResult('gpio-result', `GPIO ${data.pin} toggled → ${(data.value ?? data.current) === 1 ? 'HIGH' : 'LOW'}`, 'success');
     toast(`GPIO ${pin} toggled`, 'success');
   } catch (err) {
     showResult('gpio-result', `Error: ${err.message}`, 'error');
@@ -1068,11 +1069,15 @@ $('btn-curl').addEventListener('click', async () => {
 let _apiEndpoints = [];
 let _selectedEp = null;
 
-const API_GROUPS = ['SYSTEM','NETWORK','NTP','GPIO','DDNS','TOOLS','CONFIG'];
+const API_GROUPS = ['SYSTEM','NETWORK','NTP','WIFI','GPIO','DDNS','TOOLS','CONFIG'];
 
 function getApiGroup(path) {
-  if (path.startsWith('/api/system/')) return 'SYSTEM';
+  if (path.startsWith('/api/system/')) {
+    if (path.includes('ota')) return 'SYSTEM';
+    return 'SYSTEM';
+  }
   if (path.startsWith('/api/network/')) return 'NETWORK';
+  if (path.startsWith('/api/wifi/')) return 'WIFI';
   if (path.startsWith('/api/ntp/')) return 'NTP';
   if (path.startsWith('/api/gpio/')) return 'GPIO';
   if (path.startsWith('/api/ddns/')) return 'DDNS';
@@ -1259,10 +1264,6 @@ $('btn-config-import').addEventListener('change', async (e) => {
 });
 
 // ── System Tab ────────────────────────────────────────────
-async function loadSystemTab() {
-  // No dynamic data to load — CONFIG BACKUP is self-contained
-}
-
 $('btn-reboot').addEventListener('click', async () => {
   if (!confirm('Reboot the device? Connection will be lost.')) return;
   try {
@@ -1348,7 +1349,255 @@ async function loadNetworkTab() {
     if (info.static_subnet) $('ip-subnet').value = info.static_subnet;
 
   } catch {}
+  loadSavedNetworks();
+  loadApStatus();
 }
+
+// ── AP Mode ────────────────────────────────────────────────
+async function loadApStatus() {
+  try {
+    const data = await apiFetch('/api/wifi/ap');
+    const active = data.active || false;
+    $('ap-toggle').classList.toggle('active', active);
+    $('ap-toggle-label').textContent = active ? 'ON' : 'OFF';
+    $('ap-fields').classList.toggle('hidden', !active);
+    if (active) {
+      if (data.configured_ssid) $('ap-ssid').value = data.configured_ssid;
+      setText('ap-ip', data.ip || '—');
+      setText('ap-clients', data.clients || 0);
+    }
+    if (data.ap_fallback != null) {
+      $('ap-fallback-toggle').classList.toggle('active', data.ap_fallback === 1);
+    }
+  } catch {}
+}
+
+$('ap-toggle').addEventListener('click', async () => {
+  const toggle = $('ap-toggle');
+  const enable = !toggle.classList.contains('active');
+  const body = new URLSearchParams({ enabled: enable ? '1' : '0' }).toString();
+  try {
+    await apiFetch('/api/wifi/ap', { method: 'POST', auth: true, body });
+    toggle.classList.toggle('active', enable);
+    $('ap-toggle-label').textContent = enable ? 'ON' : 'OFF';
+    $('ap-fields').classList.toggle('hidden', !enable);
+    toast(`AP ${enable ? 'started' : 'stopped'}`, enable ? 'success' : 'warning');
+  } catch (err) {
+    toast(`AP toggle failed: ${err.message}`, 'error');
+  }
+});
+
+$('btn-ap-save').addEventListener('click', async () => {
+  const ssid = $('ap-ssid').value.trim();
+  const password = $('ap-password').value;
+  const fallback = $('ap-fallback-toggle').classList.contains('active') ? '1' : '0';
+  const body = new URLSearchParams({ ssid, password, ap_fallback: fallback }).toString();
+  try {
+    await apiFetch('/api/wifi/ap', { method: 'POST', auth: true, body });
+    showResult('ap-result', 'AP configuration saved.', 'success');
+    toast('AP config saved', 'success');
+  } catch (err) {
+    showResult('ap-result', `Error: ${err.message}`, 'error');
+  }
+});
+
+$('btn-ap-toggle').addEventListener('click', async () => {
+  const active = $('ap-toggle').classList.contains('active');
+  const enable = active ? '0' : '1';
+  const body = new URLSearchParams({ enabled: enable }).toString();
+  try {
+    await apiFetch('/api/wifi/ap', { method: 'POST', auth: true, body });
+    $('ap-toggle').classList.toggle('active', !active);
+    $('ap-toggle-label').textContent = !active ? 'ON' : 'OFF';
+    $('ap-fields').classList.toggle('hidden', active);
+    toast(`AP ${!active ? 'started' : 'stopped'}`, !active ? 'success' : 'warning');
+  } catch (err) {
+    toast(`AP failed: ${err.message}`, 'error');
+  }
+});
+
+// ── Saved Networks ─────────────────────────────────────────
+async function loadSavedNetworks() {
+  const container = $('networks-list');
+  container.innerHTML = '<div class="scan-status">Loading…</div>';
+  try {
+    const data = await apiFetch('/api/wifi/networks', { auth: true });
+    const networks = data.networks || [];
+    if (!networks.length) {
+      container.innerHTML = '<div class="scan-status">No networks saved. Add one below.</div>';
+      return;
+    }
+    container.innerHTML = '';
+    const table = document.createElement('table');
+    table.className = 'scan-table';
+    table.innerHTML = '<thead><tr><th>#</th><th>SSID</th><th>PRIORITY</th><th>ACTIONS</th></tr></thead>';
+    const tbody = document.createElement('tbody');
+    for (const net of networks) {
+      const idx = net.index;
+      const tr = document.createElement('tr');
+      const canUp = idx > 0;
+      const canDown = idx < networks.length - 1;
+      tr.innerHTML = `
+        <td>${idx + 1}</td>
+        <td>${escapeHtml(net.ssid)}</td>
+        <td>
+          <button class="card-action-btn network-up" data-idx="${idx}" ${canUp ? '' : 'disabled'}>▲</button>
+          <button class="card-action-btn network-down" data-idx="${idx}" ${canDown ? '' : 'disabled'}>▼</button>
+        </td>
+        <td>
+          <button class="card-action-btn network-connect" data-idx="${idx}">CONNECT</button>
+          <button class="card-action-btn network-delete" data-idx="${idx}">DELETE</button>
+        </td>`;
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    container.appendChild(table);
+  } catch (err) {
+    container.innerHTML = `<div class="scan-status error">Error: ${err.message}</div>`;
+  }
+}
+
+$('networks-list').addEventListener('click', async (e) => {
+  const delBtn = e.target.closest('.network-delete');
+  if (delBtn) {
+    const idx = delBtn.dataset.idx;
+    try {
+      await apiFetch('/api/wifi/networks?index=' + idx, { method: 'DELETE', auth: true });
+      toast('Network removed', 'success');
+      loadSavedNetworks();
+    } catch (err) {
+      toast(`Delete failed: ${err.message}`, 'error');
+    }
+    return;
+  }
+  const connectBtn = e.target.closest('.network-connect');
+  if (connectBtn) {
+    const idx = connectBtn.dataset.idx;
+    try {
+      const data = await apiFetch('/api/wifi/connect', { method: 'POST', auth: true, body: 'index=' + idx });
+      toast('Connecting to ' + (data.ssid || 'network ' + idx), 'warning');
+    } catch (err) {
+      toast(`Connect failed: ${err.message}`, 'error');
+    }
+    return;
+  }
+  const upBtn = e.target.closest('.network-up');
+  if (upBtn) {
+    const idx = parseInt(upBtn.dataset.idx);
+    try {
+      await apiFetch('/api/wifi/networks/reorder', { method: 'POST', auth: true, body: 'from=' + idx + '&to=' + (idx - 1) });
+      loadSavedNetworks();
+    } catch (err) {
+      toast(`Reorder failed: ${err.message}`, 'error');
+    }
+    return;
+  }
+  const downBtn = e.target.closest('.network-down');
+  if (downBtn) {
+    const idx = parseInt(downBtn.dataset.idx);
+    try {
+      await apiFetch('/api/wifi/networks/reorder', { method: 'POST', auth: true, body: 'from=' + idx + '&to=' + (idx + 1) });
+      loadSavedNetworks();
+    } catch (err) {
+      toast(`Reorder failed: ${err.message}`, 'error');
+    }
+    return;
+  }
+});
+
+$('btn-networks-refresh').addEventListener('click', loadSavedNetworks);
+
+$('btn-network-add').addEventListener('click', async () => {
+  const ssid = $('network-add-ssid').value.trim();
+  const password = $('network-add-pswd').value;
+  if (!ssid) { toast('Enter an SSID', 'warning'); return; }
+  const body = new URLSearchParams({ ssid, password }).toString();
+  try {
+    await apiFetch('/api/wifi/networks', { method: 'POST', auth: true, body });
+    toast('Network added', 'success');
+    $('network-add-ssid').value = '';
+    $('network-add-pswd').value = '';
+    loadSavedNetworks();
+  } catch (err) {
+    showResult('network-result', `Error: ${err.message}`, 'error');
+    toast('Add failed', 'error');
+  }
+});
+
+$('btn-network-connect').addEventListener('click', async () => {
+  const ssid = $('network-add-ssid').value.trim();
+  const password = $('network-add-pswd').value;
+  if (!ssid) { toast('Enter an SSID', 'warning'); return; }
+  const body = new URLSearchParams({ ssid, password }).toString();
+  try {
+    await apiFetch('/api/wifi/networks', { method: 'POST', auth: true, body });
+    toast('Network added, connecting...', 'success');
+    // Now try to connect to the last added network
+    const data = await apiFetch('/api/wifi/networks', { auth: true });
+    const networks = data.networks || [];
+    if (networks.length > 0) {
+      const lastIdx = networks[networks.length - 1].index;
+      await apiFetch('/api/wifi/connect', { method: 'POST', auth: true, body: 'index=' + lastIdx });
+      toast('Connecting...', 'warning');
+    }
+    loadSavedNetworks();
+  } catch (err) {
+    showResult('network-result', `Error: ${err.message}`, 'error');
+    toast('Failed', 'error');
+  }
+});
+
+// ── OTA ────────────────────────────────────────────────────
+async function loadOtaConfig() {
+  try {
+    const data = await apiFetch('/api/system/ota');
+    $('ota-url').value = data.ota_url || '';
+    $('ota-interval').value = data.ota_interval || 0;
+    setText('ota-current-version', data.current_version || '—');
+    if (data.last_check_elapsed != null) {
+      setText('ota-last-check', formatUptime(data.last_check_elapsed) + ' ago');
+    } else {
+      setText('ota-last-check', '—');
+    }
+  } catch {}
+}
+
+$('btn-ota-save').addEventListener('click', async () => {
+  const url = $('ota-url').value.trim();
+  const interval = parseInt($('ota-interval').value) || 0;
+  const body = new URLSearchParams({ url, interval }).toString();
+  try {
+    await apiFetch('/api/system/ota', { method: 'POST', auth: true, body });
+    showResult('ota-result', 'OTA config saved', 'success');
+    toast('OTA config saved', 'success');
+  } catch (err) {
+    showResult('ota-result', `Error: ${err.message}`, 'error');
+    toast('OTA save failed', 'error');
+  }
+});
+
+$('btn-ota-check').addEventListener('click', async () => {
+  const btn = $('btn-ota-check');
+  btn.disabled = true;
+  btn.textContent = '⟳ CHECKING…';
+  try {
+    const data = await apiFetch('/api/system/ota/check', { method: 'POST', auth: true });
+    if (data.updating) {
+      showResult('ota-result', 'Update found — flashing firmware, device will reboot...', 'success');
+      toast('OTA update started', 'warning', 10000);
+    } else {
+      const errMsg = data.error || 'up to date';
+      showResult('ota-result', `No update: ${errMsg}`, 'success');
+      toast('Firmware is current', 'success');
+    }
+  } catch (err) {
+    showResult('ota-result', `Check failed: ${err.message}`, 'error');
+    toast('OTA check failed', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'CHECK FOR UPDATE';
+  }
+});
 
 function escapeHtml(str) {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');

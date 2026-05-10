@@ -4,10 +4,6 @@ LogEntry logBuffer[LOG_BUFFER_SIZE];
 int logHead = 0;
 int logCount = 0;
 
-void logBegin() {
-  for (int i = 0; i < LOG_BUFFER_SIZE; i++) logBuffer[i].ms = 0;
-}
-
 void logAdd(unsigned long ms, String msg) {
   logBuffer[logHead].ms = ms;
   strncpy(logBuffer[logHead].msg, msg.c_str(), 63);

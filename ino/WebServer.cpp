@@ -5,6 +5,8 @@
 #include "GPIO.h"
 #include "DDNS.h"
 #include "Ping.h"
+#include "WiFiManager.h"
+#include "OTA.h"
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <WiFiClient.h>
@@ -43,9 +45,16 @@ bool checkAuth() {
     return false;
   }
   String auth = server.header("Authorization");
-  if (!auth.startsWith("Basic ")) return false;
+  if (!auth.startsWith("Basic ")) {
+    server.send(401, "application/json", "{\"error\":\"Unauthorized\"}");
+    return false;
+  }
   auth = base64Decode(auth.substring(6));
-  return auth == "admin:" + String(cfg.admin_password);
+  if (auth != "admin:" + String(cfg.admin_password)) {
+    server.send(401, "application/json", "{\"error\":\"Unauthorized\"}");
+    return false;
+  }
+  return true;
 }
 
 void sendCORS() {
@@ -55,14 +64,17 @@ void sendCORS() {
 }
 
 void setupRoutes() {
-  // Catch-all OPTIONS handler for undefined routes
   server.onNotFound([]() {
     if (server.method() == HTTP_OPTIONS) {
       sendCORS();
       server.send(200);
-    } else {
-      server.send(404, "text/plain", "Not found");
+      return;
     }
+    if (wifiAPRunning()) {
+      server.send(200, "text/html", index_page);
+      return;
+    }
+    server.send(404, "text/plain", "Not found");
   });
 
   // Helper lambda for OPTIONS
@@ -83,7 +95,7 @@ void setupRoutes() {
   addOptions("/api/help");
   server.on("/api/help", []() {
     sendCORS();
-    JsonDocument doc;
+    DynamicJsonDocument doc(8192);
     JsonArray a = doc["endpoints"].to<JsonArray>();
     auto add = [&](const char* path, const char* method, bool auth, std::initializer_list<const char*> params) {
       JsonObject o = a.add<JsonObject>();
@@ -166,14 +178,13 @@ void setupRoutes() {
   addOptions("/api/info");
   server.on("/api/info", []() {
     sendCORS();
-    JsonDocument doc;
+    DynamicJsonDocument doc(2048);
     doc["mac"] = WiFi.macAddress();
     doc["ssid"] = WiFi.SSID();
     doc["bssid"] = WiFi.BSSIDstr();
     doc["rssi"] = WiFi.RSSI();
     doc["channel"] = WiFi.channel();
     { uint8 phy = WiFi.getPhyMode(); doc["phy_mode"] = (phy == 2 ? "11g" : phy == 3 ? "11n" : "11b"); }
-    doc["tx_power"] = WiFi.getTxPower();
     doc["mdns"] = cfg.mdns_name;
     doc["ddns"] = cfg.ddns_hostname;
     doc["ddns_domain"] = cfg.ddns_domain;
@@ -201,7 +212,11 @@ void setupRoutes() {
     doc["ddns_upd_url"] = cfg.ddns_upd_url;
     doc["public_ip_urls"] = cfg.public_ip_urls;
     doc["firmware"] = FIRMWARE_VERSION;
-    doc["last_check_time"] = (long)(lastCheckTime > 0 ? millis() - lastCheckTime : -1);
+    doc["ap_ssid"] = cfg.ap_ssid;
+    doc["ap_fallback"] = cfg.ap_fallback;
+    doc["ota_url"] = cfg.ota_url;
+    doc["ota_check_interval"] = cfg.ota_check_interval;
+    doc["last_check_elapsed_ms"] = (long)(lastCheckTime > 0 ? millis() - lastCheckTime : -1);
     doc["last_check_match"] = lastCheckMatch;
     doc["last_check_public_ip"] = lastCheckedPublicIP;
     doc["last_check_ddns_ip"] = lastCheckedDomainIP;
@@ -231,7 +246,7 @@ void setupRoutes() {
     int tz_hours = cfg.tz_offset / 3600;
     char utc_str[16];
     snprintf(utc_str, sizeof(utc_str), "UTC%+dh", tz_hours);
-    JsonDocument doc;
+    DynamicJsonDocument doc(512);
     doc["time"] = ntpGetTime();
     doc["epoch"] = (long)epoch;
     doc["tz_offset"] = cfg.tz_offset;
@@ -323,18 +338,11 @@ void setupRoutes() {
       serverUsed = (comma == -1) ? urls : urls.substring(0, comma);
       serverUsed.trim();
     }
-    JsonDocument doc;
+    DynamicJsonDocument doc(256);
     doc["ip"] = ip;
     doc["server"] = serverUsed;
     doc["success"] = success;
     String r; serializeJson(doc, r);
-    server.send(200, "application/json", r);
-  });
-
-  addOptions("/api/ddns/check");
-  server.on("/api/ddns/check", []() {
-    sendCORS();
-    String r = ddnsCheck();
     server.send(200, "application/json", r);
   });
 
@@ -512,7 +520,7 @@ void setupRoutes() {
     } else if (n == WIFI_SCAN_RUNNING) {
       server.send(200, "application/json", "{\"status\":\"scanning\"}");
     } else {
-      JsonDocument doc;
+      DynamicJsonDocument doc(2048);
       JsonArray networks = doc["networks"].to<JsonArray>();
       for (int i = 0; i < n; i++) {
         JsonObject net = networks.add<JsonObject>();
@@ -543,7 +551,7 @@ void setupRoutes() {
       WiFi.config(WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask());
     }
     bool valid = validateNetworkConfig();
-    JsonDocument doc;
+    DynamicJsonDocument doc(512);
     doc["status"] = "saved";
     doc["dns1"] = cfg.static_dns1;
     doc["dns2"] = cfg.static_dns2;
@@ -568,7 +576,7 @@ void setupRoutes() {
     }
     storageSave();
     bool valid = validateNetworkConfig();
-    JsonDocument doc;
+    DynamicJsonDocument doc(512);
     doc["status"] = "saved";
     doc["use_static_ip"] = cfg.use_static_ip;
     if (!valid) doc["warning"] = "config invalid, switched to DHCP";
@@ -584,15 +592,6 @@ void setupRoutes() {
     cfg.pwm_pin = pin;
     storageSave();
     server.send(200, "application/json", "{\"status\":\"saved\",\"pwm_pin\":" + String(cfg.pwm_pin) + "}");
-  });
-
-  addOptions("/api/ping");
-  server.on("/api/ping", []() {
-    sendCORS();
-    String host = server.arg("host");
-    if (host == "") { server.send(400, "application/json", "{\"error\":\"Missing host\"}"); return; }
-    String result = pingHost(host);
-    server.send(200, "application/json", result);
   });
 
   addOptions("/api/system/reboot");
@@ -615,7 +614,7 @@ void setupRoutes() {
   addOptions("/api/system/version");
   server.on("/api/system/version", []() {
     sendCORS();
-    JsonDocument doc;
+    DynamicJsonDocument doc(512);
     doc["version"] = FIRMWARE_VERSION;
     doc["build_date"] = __DATE__;
     doc["build_time"] = __TIME__;
@@ -626,7 +625,7 @@ void setupRoutes() {
   addOptions("/api/config/export");
   server.on("/api/config/export", []() {
     if (!checkAuth()) return;
-    JsonDocument doc;
+    DynamicJsonDocument doc(4096);
     doc["wifi_ssid"] = cfg.wifi_ssid;
     doc["wifi_password"] = cfg.wifi_password;
     doc["mdns_name"] = cfg.mdns_name;
@@ -649,6 +648,10 @@ void setupRoutes() {
     doc["ddns_check_interval"] = cfg.ddns_check_interval;
     doc["ddns_upd_url"] = cfg.ddns_upd_url;
     doc["public_ip_urls"] = cfg.public_ip_urls;
+    doc["ap_ssid"] = cfg.ap_ssid;
+    doc["ap_fallback"] = cfg.ap_fallback;
+    doc["ota_url"] = cfg.ota_url;
+    doc["ota_check_interval"] = cfg.ota_check_interval;
     String r; serializeJson(doc, r);
     server.send(200, "application/json", r);
   });
@@ -658,7 +661,7 @@ void setupRoutes() {
     if (!checkAuth()) return;
     String body = server.arg("config");
     if (body == "") { server.send(400, "application/json", "{\"error\":\"Missing JSON body\"}"); return; }
-    JsonDocument doc;
+    DynamicJsonDocument doc(2048);
     DeserializationError err = deserializeJson(doc, body);
     if (err) { server.send(400, "application/json", "{\"error\":\"Invalid JSON\"}"); return; }
     auto setStr = [&](const char* key, char* dest, size_t sz) {
@@ -737,7 +740,7 @@ void setupRoutes() {
   addOptions("/api/status");
   server.on("/api/status", []() {
     sendCORS();
-    JsonDocument doc;
+    DynamicJsonDocument doc(512);
     doc["version"] = FIRMWARE_VERSION;
     doc["uptime"] = millis() / 1000;
     doc["free_heap"] = ESP.getFreeHeap();
@@ -754,14 +757,14 @@ void setupRoutes() {
   addOptions("/api/system/status");
   server.on("/api/system/status", []() {
     sendCORS();
-    JsonDocument doc;
+    DynamicJsonDocument doc(512);
     doc["version"] = FIRMWARE_VERSION;
     doc["build_date"] = __DATE__;
     doc["build_time"] = __TIME__;
     doc["mac"] = WiFi.macAddress();
     doc["uptime"] = millis() / 1000;
     doc["free_heap"] = ESP.getFreeHeap();
-    doc["last_check_time"] = (long)(lastCheckTime > 0 ? millis() - lastCheckTime : -1);
+    doc["last_check_elapsed_ms"] = (long)(lastCheckTime > 0 ? millis() - lastCheckTime : -1);
     doc["last_check_match"] = lastCheckMatch;
     String r; serializeJson(doc, r);
     server.send(200, "application/json", r);
@@ -777,7 +780,7 @@ void setupRoutes() {
   addOptions("/api/network/status");
   server.on("/api/network/status", []() {
     sendCORS();
-    JsonDocument doc;
+    DynamicJsonDocument doc(1024);
     doc["ssid"] = WiFi.SSID();
     doc["bssid"] = WiFi.BSSIDstr();
     doc["rssi"] = WiFi.RSSI();
@@ -786,7 +789,6 @@ void setupRoutes() {
     const char* phyStr = "11b";
     if (phy == 2) phyStr = "11g"; else if (phy == 3) phyStr = "11n";
     doc["phy_mode"] = phyStr;
-    doc["tx_power"] = WiFi.getTxPower();
     doc["mac"] = WiFi.macAddress();
     doc["local_ip"] = WiFi.localIP().toString();
     doc["gateway"] = WiFi.gatewayIP().toString();
@@ -799,6 +801,9 @@ void setupRoutes() {
     doc["auto_reconnect"] = WiFi.getAutoReconnect();
     doc["use_static_ip"] = cfg.use_static_ip;
     doc["public_ip"] = getCachedPublicIP();
+    doc["ap_active"] = wifiAPRunning();
+    doc["ap_ssid"] = wifiAPSSID();
+    doc["ap_clients"] = wifiAPClientCount();
     String r; serializeJson(doc, r);
     server.send(200, "application/json", r);
   });
@@ -810,7 +815,7 @@ void setupRoutes() {
     if (n == WIFI_SCAN_FAILED) { WiFi.scanNetworks(true); server.send(200, "application/json", "{\"status\":\"scanning\"}"); }
     else if (n == WIFI_SCAN_RUNNING) { server.send(200, "application/json", "{\"status\":\"scanning\"}"); }
     else {
-      JsonDocument doc; JsonArray networks = doc["networks"].to<JsonArray>();
+      DynamicJsonDocument doc(2048); JsonArray networks = doc["networks"].to<JsonArray>();
       for (int i = 0; i < n; i++) {
         JsonObject net = networks.add<JsonObject>();
         net["ssid"] = WiFi.SSID(i); net["rssi"] = WiFi.RSSI(i);
@@ -849,7 +854,7 @@ void setupRoutes() {
   addOptions("/api/network/ip/config");
   server.on("/api/network/ip/config", HTTP_GET, []() {
     if (!checkAuth()) return;
-    JsonDocument doc;
+    DynamicJsonDocument doc(512);
     doc["use_static_ip"] = cfg.use_static_ip;
     doc["ip"] = cfg.static_ip;
     doc["gateway"] = cfg.static_gateway;
@@ -867,8 +872,9 @@ void setupRoutes() {
       if (server.arg("subnet") != "") strncpy(cfg.static_subnet, server.arg("subnet").c_str(), sizeof(cfg.static_subnet) - 1);
     }
     storageSave();
+    applyNetworkConfig();
     bool valid = validateNetworkConfig();
-    JsonDocument doc; doc["status"] = "saved"; doc["use_static_ip"] = cfg.use_static_ip;
+    DynamicJsonDocument doc(512); doc["status"] = "saved"; doc["use_static_ip"] = cfg.use_static_ip;
     if (!valid) doc["warning"] = "config invalid, switched to DHCP";
     String r; serializeJson(doc, r);
     server.send(200, "application/json", r);
@@ -877,7 +883,7 @@ void setupRoutes() {
   addOptions("/api/network/dns/config");
   server.on("/api/network/dns/config", HTTP_GET, []() {
     if (!checkAuth()) return;
-    JsonDocument doc;
+    DynamicJsonDocument doc(512);
     doc["dns1"] = cfg.static_dns1;
     doc["dns2"] = cfg.static_dns2;
     doc["use_custom_dns"] = cfg.use_custom_dns;
@@ -894,7 +900,7 @@ void setupRoutes() {
     if (cfg.use_custom_dns) { applyNetworkConfig(); }
     else { WiFi.config(WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask()); }
     bool valid = validateNetworkConfig();
-    JsonDocument doc; doc["status"] = "saved"; doc["dns1"] = cfg.static_dns1; doc["dns2"] = cfg.static_dns2; doc["use_custom_dns"] = cfg.use_custom_dns;
+    DynamicJsonDocument doc(512); doc["status"] = "saved"; doc["dns1"] = cfg.static_dns1; doc["dns2"] = cfg.static_dns2; doc["use_custom_dns"] = cfg.use_custom_dns;
     if (!valid) doc["warning"] = "config invalid, switched to DHCP";
     String r; serializeJson(doc, r);
     server.send(200, "application/json", r);
@@ -942,7 +948,7 @@ void setupRoutes() {
       String urls = String(cfg.public_ip_urls);
       int comma = urls.indexOf(','); serverUsed = (comma == -1) ? urls : urls.substring(0, comma); serverUsed.trim();
     }
-    JsonDocument doc; doc["ip"] = ip; doc["server"] = serverUsed; doc["success"] = success;
+    DynamicJsonDocument doc(512); doc["ip"] = ip; doc["server"] = serverUsed; doc["success"] = success;
     String r; serializeJson(doc, r);
     server.send(200, "application/json", r);
   });
@@ -951,7 +957,7 @@ void setupRoutes() {
   addOptions("/api/ntp/config");
   server.on("/api/ntp/config", HTTP_GET, []() {
     sendCORS();
-    JsonDocument doc;
+    DynamicJsonDocument doc(512);
     doc["ntp_server"] = cfg.ntp_server;
     doc["tz_offset"] = cfg.tz_offset;
     String r; serializeJson(doc, r);
@@ -962,7 +968,23 @@ void setupRoutes() {
     if (server.arg("server") != "") strncpy(cfg.ntp_server, server.arg("server").c_str(), sizeof(cfg.ntp_server) - 1);
     if (server.arg("tz_offset") != "") cfg.tz_offset = server.arg("tz_offset").toInt();
     storageSave();
-    JsonDocument doc; doc["status"] = "saved"; doc["ntp_server"] = cfg.ntp_server; doc["tz_offset"] = cfg.tz_offset;
+    DynamicJsonDocument doc(512); doc["status"] = "saved"; doc["ntp_server"] = cfg.ntp_server; doc["tz_offset"] = cfg.tz_offset;
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
+  });
+
+  addOptions("/api/ntp/time");
+  server.on("/api/ntp/time", []() {
+    sendCORS();
+    time_t epoch = ntpGetEpoch();
+    int tz_hours = cfg.tz_offset / 3600;
+    char utc_str[16];
+    snprintf(utc_str, sizeof(utc_str), "UTC%+dh", tz_hours);
+    DynamicJsonDocument doc(512);
+    doc["time"] = ntpGetTime();
+    doc["epoch"] = (long)epoch;
+    doc["tz_offset"] = cfg.tz_offset;
+    doc["utc"] = utc_str;
     String r; serializeJson(doc, r);
     server.send(200, "application/json", r);
   });
@@ -1060,7 +1082,7 @@ void setupRoutes() {
   server.on("/api/ddns/check", HTTP_POST, []() {
     if (!checkAuth()) return;
     bool match = checkDDNS();
-    JsonDocument doc;
+    DynamicJsonDocument doc(512);
     doc["match"] = match;
     doc["public_ip"] = lastCheckedPublicIP;
     doc["ddns_ip"] = lastCheckedDomainIP;
@@ -1071,7 +1093,7 @@ void setupRoutes() {
   addOptions("/api/ddns/config");
   server.on("/api/ddns/config", HTTP_GET, []() {
     sendCORS();
-    JsonDocument doc;
+    DynamicJsonDocument doc(512);
     doc["hostname"] = cfg.ddns_hostname;
     doc["domain"] = cfg.ddns_domain;
     doc["upd_url"] = cfg.ddns_upd_url;
@@ -1165,6 +1187,145 @@ void setupRoutes() {
     } else { payload = "Error (" + String(code) + "): " + http.errorToString(code); }
     http.end();
     server.send(200, "text/plain", payload);
+  });
+
+  // ── WIFI NETWORKS ──
+  addOptions("/api/wifi/networks");
+  server.on("/api/wifi/networks", HTTP_GET, []() {
+    if (!checkAuth()) return;
+    DynamicJsonDocument doc(1024);
+    JsonArray arr = doc["networks"].to<JsonArray>();
+    for (int i = 0; i < networkListCount(); i++) {
+      WifiNetwork net;
+      if (networkListGet(i, net)) {
+        JsonObject o = arr.add<JsonObject>();
+        o["ssid"] = net.ssid;
+        o["index"] = i;
+      }
+    }
+    doc["count"] = networkListCount();
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
+  });
+  server.on("/api/wifi/networks", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    String ssid = server.arg("ssid");
+    String password = server.arg("password");
+    if (ssid == "") { server.send(400, "application/json", "{\"error\":\"Missing ssid\"}"); return; }
+    if (!networkListAdd(ssid.c_str(), password.c_str())) {
+      server.send(400, "application/json", "{\"error\":\"Max networks reached\"}");
+      return;
+    }
+    server.send(200, "application/json", "{\"status\":\"added\",\"count\":" + String(networkListCount()) + "}");
+  });
+  server.on("/api/wifi/networks", HTTP_DELETE, []() {
+    if (!checkAuth()) return;
+    int idx = server.arg("index").toInt();
+    if (!networkListRemove(idx)) {
+      server.send(400, "application/json", "{\"error\":\"Invalid index\"}");
+      return;
+    }
+    server.send(200, "application/json", "{\"status\":\"removed\",\"count\":" + String(networkListCount()) + "}");
+  });
+
+  addOptions("/api/wifi/networks/reorder");
+  server.on("/api/wifi/networks/reorder", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    int from = server.arg("from").toInt();
+    int to = server.arg("to").toInt();
+    if (!networkListMove(from, to)) {
+      server.send(400, "application/json", "{\"error\":\"Invalid indices\"}");
+      return;
+    }
+    server.send(200, "application/json", "{\"status\":\"reordered\"}");
+  });
+
+  addOptions("/api/wifi/connect");
+  server.on("/api/wifi/connect", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    int idx = server.arg("index").toInt();
+    WifiNetwork net;
+    if (!networkListGet(idx, net)) {
+      server.send(400, "application/json", "{\"error\":\"Invalid index\"}");
+      return;
+    }
+    WiFi.disconnect();
+    delay(100);
+    WiFi.begin(net.ssid, net.password);
+    server.send(200, "application/json", "{\"status\":\"connecting\",\"ssid\":\"" + String(net.ssid) + "\"}");
+  });
+
+  // ── WIFI AP ──
+  addOptions("/api/wifi/ap");
+  server.on("/api/wifi/ap", HTTP_GET, []() {
+    sendCORS();
+    DynamicJsonDocument doc(512);
+    doc["active"] = wifiAPRunning();
+    doc["ssid"] = wifiAPSSID();
+    doc["ip"] = wifiAPIP();
+    doc["clients"] = wifiAPClientCount();
+    doc["configured_ssid"] = cfg.ap_ssid;
+    doc["ap_fallback"] = cfg.ap_fallback;
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
+  });
+  server.on("/api/wifi/ap", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    String enabled = server.arg("enabled");
+    if (enabled != "") {
+      if (enabled == "1" || enabled == "true") {
+        wifiAPStart();
+        server.send(200, "application/json", "{\"status\":\"ap_started\"}");
+      } else {
+        wifiAPStop();
+        server.send(200, "application/json", "{\"status\":\"ap_stopped\"}");
+      }
+      return;
+    }
+    String ssid = server.arg("ssid");
+    String password = server.arg("password");
+    String fallback = server.arg("ap_fallback");
+    if (ssid != "") strncpy(cfg.ap_ssid, ssid.c_str(), sizeof(cfg.ap_ssid) - 1);
+    if (password != "") strncpy(cfg.ap_password, password.c_str(), sizeof(cfg.ap_password) - 1);
+    if (fallback != "") cfg.ap_fallback = (fallback == "1" || fallback == "true") ? 1 : 0;
+    storageSave();
+    if (wifiAPRunning()) {
+      wifiAPStop();
+      wifiAPStart();
+    }
+    server.send(200, "application/json", "{\"status\":\"ap_config_saved\"}");
+  });
+
+  // ── SYSTEM OTA ──
+  addOptions("/api/system/ota");
+  server.on("/api/system/ota", HTTP_GET, []() {
+    sendCORS();
+    DynamicJsonDocument doc(512);
+    doc["ota_url"] = cfg.ota_url;
+    doc["ota_interval"] = cfg.ota_check_interval;
+    doc["current_version"] = FIRMWARE_VERSION;
+    unsigned long last = otaLastCheckMs();
+    if (last > 0) doc["last_check_elapsed"] = (long)((millis() - last) / 1000);
+    String r; serializeJson(doc, r);
+    server.send(200, "application/json", r);
+  });
+  server.on("/api/system/ota", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    String url = server.arg("url");
+    String interval = server.arg("interval");
+    if (url != "") strncpy(cfg.ota_url, url.c_str(), sizeof(cfg.ota_url) - 1);
+    if (interval != "") cfg.ota_check_interval = interval.toInt();
+    storageSave();
+    server.send(200, "application/json", "{\"status\":\"saved\"}");
+  });
+  server.on("/api/system/ota/check", HTTP_POST, []() {
+    if (!checkAuth()) return;
+    bool ok = otaCheckNow();
+    if (ok) {
+      server.send(200, "application/json", "{\"updating\":true}");
+    } else {
+      server.send(200, "application/json", "{\"updating\":false,\"error\":\"" + otaLastError() + "\"}");
+    }
   });
 
   server.begin();

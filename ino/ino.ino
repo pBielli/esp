@@ -13,30 +13,32 @@
 #include "NTP.h"
 #include "GPIO.h"
 #include "DDNS.h"
+#include "WiFiManager.h"
+#include "OTA.h"
 #include "WebServer.h"
 
 unsigned long lastCheck = 0;
-bool flag_firtstRun = true;
+bool flag_firstRun = true;
+
 void setup() {
   Serial.begin(115200);
   Serial.println("\n");
 
   storageBegin();
   storageLoad();
+  networkListLoad();
+
   if (!storageInitialized()) {
     storageReset();
+    networkListSave();
     logPrint("CONFIG", "reset to default");
   }
 
   pinMode(cfg.led_pin, OUTPUT);
   digitalWrite(cfg.led_pin, cfg.gpio_invert ? LOW : HIGH);
 
-  WiFi.setAutoReconnect(true);
-  WiFi.persistent(false);
-  WiFi.begin(cfg.wifi_ssid, cfg.wifi_password);
-  logPrint("WIFI", "Connecting to " + String(cfg.wifi_ssid));
-
   applyNetworkConfig();
+  wifiSetup();
   validateNetworkConfig();
 
   ntpBegin();
@@ -53,6 +55,9 @@ void setup() {
 
 void loop() {
   server.handleClient();
+  MDNS.update();
+  wifiLoop();
+  otaLoop();
 
   static bool wifiWasConnected = false;
   if (WiFi.status() == WL_CONNECTED && !wifiWasConnected) {
@@ -64,9 +69,9 @@ void loop() {
     wifiWasConnected = false;
   }
 
-  if (millis() - lastCheck > (unsigned long)cfg.ddns_check_interval * 1000 || flag_firtstRun) {
-    if(flag_firtstRun)
-      flag_firtstRun = false;
+  if (millis() - lastCheck > (unsigned long)cfg.ddns_check_interval * 1000 || flag_firstRun) {
+    if(flag_firstRun)
+      flag_firstRun = false;
     if (WiFi.status() == WL_CONNECTED) checkDDNS();
     lastCheck = millis();
   }

@@ -8,7 +8,6 @@ String getPublicIP();
 String getPublicIP(int serverIdx);
 String updateDDNS(String ip);
 bool checkDDNS();
-bool checkAndUpdateDDNS();
 String getCachedDDNSIP();
 String getCachedPublicIP();
 String ddnsCheck();
