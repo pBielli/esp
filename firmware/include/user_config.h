@@ -6,8 +6,8 @@
 // ============================================================
 
 // ── WiFi default ─────────────────────────────────────────────
-#define DEFAULT_WIFI_SSID      "NomeReteWiFi"
-#define DEFAULT_WIFI_PASSWORD  "PasswordWiFi"
+#define DEFAULT_WIFI_SSID      "CasaBielli"
+#define DEFAULT_WIFI_PASSWORD  "CasaBielli01"
 
 // ── Access Point fallback ────────────────────────────────────
 #define DEFAULT_AP_SSID        ""        // vuoto = "ESP-<MAC>"
@@ -20,9 +20,9 @@
 #define DEFAULT_MDNS_NAME      "esp-device"
 
 // ── DDNS (DuckDNS) ───────────────────────────────────────────
-#define DEFAULT_DDNS_HOSTNAME  "tuodominio.duckdns.org"
-#define DEFAULT_DDNS_TOKEN     "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-#define DEFAULT_DDNS_DOMAIN    "tuodominio"
+#define DEFAULT_DDNS_HOSTNAME  "patbee.duckdns.org"
+#define DEFAULT_DDNS_TOKEN     "3894523a-d53d-433d-b661-83ac156319fa"
+#define DEFAULT_DDNS_DOMAIN    "patbee"
 
 // ── Hardware ─────────────────────────────────────────────────
 #define DEFAULT_LED_PIN        2         // GPIO2 = LED blu su NodeMCU/D1 Mini
@@ -31,8 +31,8 @@
 
 // ── NTP ──────────────────────────────────────────────────────
 #define DEFAULT_NTP_SERVER     "pool.ntp.org"
-#define DEFAULT_TZ_OFFSET      3600      // UTC+1 (Italia invernale)
-//                             7200      // UTC+2 (Italia estiva / CEST)
+#define DEFAULT_TZ_OFFSET      7200      // UTC+2 (Italia estiva / CEST)
+//                             3200      // UTC+1 (Italia invernale / CET)
 
 // ── DDNS intervallo (secondi) ────────────────────────────────
 #define DEFAULT_DDNS_INTERVAL  300       // 5 minuti

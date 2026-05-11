@@ -98,7 +98,7 @@ void setupRoutes() {
     DynamicJsonDocument doc(2048);
     JsonArray a = doc["endpoints"].to<JsonArray>();
     auto add = [&](const char* path, const char* method, bool auth, std::initializer_list<const char*> params) {
-      JsonObject o = a.add<JsonObject>();
+      JsonObject o = a.createNestedObject();
       o["path"] = path;
       o["method"] = method;
       o["auth"] = auth;
@@ -474,7 +474,7 @@ void setupRoutes() {
     else {
       DynamicJsonDocument doc(1024); JsonArray networks = doc["networks"].to<JsonArray>();
       for (int i = 0; i < n; i++) {
-        JsonObject net = networks.add<JsonObject>();
+        JsonObject net = networks.createNestedObject();
         net["ssid"] = WiFi.SSID(i); net["rssi"] = WiFi.RSSI(i);
         net["channel"] = WiFi.channel(i); net["encryption"] = WiFi.encryptionType(i);
         uint8_t* bssid = WiFi.BSSID(i);
@@ -855,7 +855,7 @@ void setupRoutes() {
     for (int i = 0; i < networkListCount(); i++) {
       WifiNetwork net;
       if (networkListGet(i, net)) {
-        JsonObject o = arr.add<JsonObject>();
+        JsonObject o = arr.createNestedObject();
         o["ssid"] = net.ssid;
         o["index"] = i;
       }
