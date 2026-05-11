@@ -1,0 +1,6 @@
+.pio/
+.vscode/
+__pycache__/
+
+# NON committare mai le credenziali reali!
+# include/user_config.h    ← decommenta se vuoi escluderlo dal repo
