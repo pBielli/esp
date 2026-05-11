@@ -7,7 +7,7 @@
 #define EEPROM_SIZE 2048
 #define MAGIC "DDC"
 #define CORS_ORIGIN "https://pbielli.github.io"
-#define FIRMWARE_VERSION "1.0.0"
+#define FIRMWARE_VERSION "1.0.1"
 
 #define MAX_NETWORKS 4
 #define NETWORK_LIST_OFFSET 1536
