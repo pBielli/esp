@@ -24,4 +24,8 @@ for /d %%d in (firmware\.pio\build\*) do (
     )
 )
 
+REM Genera firmwares.json
+echo Generazione firmwares.json...
+powershell -ExecutionPolicy Bypass -Command "$firmwares = @(); Get-ChildItem 'docs\bin\*' -Directory | ForEach-Object { $board = $_.Name; Get-ChildItem ('{0}\*.bin' -f $_.FullName) | ForEach-Object { $filename = $_.Name; $version = $filename -replace '^v(.*)_firmware\.bin$','$1'; $firmwares += @{board=$board;version=$version;filename=$filename;url=($board+'/'+$filename)} } }; @{firmwares=$firmwares} | ConvertTo-Json -Depth 3 | Set-Content 'docs\bin\firmwares.json' -Encoding UTF8"
+
 echo Fatto.

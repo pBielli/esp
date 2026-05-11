@@ -1,0 +1,16 @@
+﻿{
+    "firmwares":  [
+                      {
+                          "filename":  "v1.0.0_firmware.bin",
+                          "url":  "nodemcu_1_0/v1.0.0_firmware.bin",
+                          "version":  "1.0.0",
+                          "board":  "nodemcu_1_0"
+                      },
+                      {
+                          "filename":  "v1.0.0_firmware.bin",
+                          "url":  "wemos_d1_r1/v1.0.0_firmware.bin",
+                          "version":  "1.0.0",
+                          "board":  "wemos_d1_r1"
+                      }
+                  ]
+}
