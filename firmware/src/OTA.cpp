@@ -53,14 +53,15 @@ void otaSetup() {
 
 void otaLoop() {
   if (cfg.ota_check_interval <= 0) return;
-  if (WiFi.status() != WL_CONNECTED) return;
+  if (!WiFi.isConnected()) return;
   if (millis() - lastCheck < (unsigned long)cfg.ota_check_interval * 1000) return;
   otaCheckNow();
 }
 
 bool otaCheckNow() {
-  if (WiFi.status() != WL_CONNECTED) {
+  if (WiFi.localIP() == IPAddress(0, 0, 0, 0) || WiFi.SSID().length() == 0) {
     lastError = "WiFi not connected";
+    logPrint("OTA", "Check skipped: WiFi not connected (" + String(WiFi.status()) + ")");
     return false;
   }
 
@@ -74,21 +75,30 @@ bool otaCheckNow() {
 
   logPrint("OTA", "Checking: " + url);
 
+  String effectiveUrl = url;
+
+  // If URL ends with .bin, skip HTTP check and try update directly
+  if (url.endsWith(".bin")) {
+    logPrint("OTA", "Direct binary URL, updating");
+    return otaUpdateFromUrl(url);
+  }
+
   HTTPClient http;
   http.setTimeout(10000);
   http.setUserAgent("ESP8266-OTA/1.0");
+
   WiFiClient client;
-  http.begin(client, url);
-
-  String payload;
-  String effectiveUrl = url;
   WiFiClientSecure httpsClient;
+  bool isHttps = url.startsWith("https://");
 
-  if (url.startsWith("https://")) {
-    http.end();
+  if (isHttps) {
     httpsClient.setInsecure();
     http.begin(httpsClient, url);
+  } else {
+    http.begin(client, url);
   }
+
+  String payload;
 
   int code = http.GET();
   if (code == HTTP_CODE_OK) {
@@ -98,14 +108,13 @@ bool otaCheckNow() {
   http.end();
 
   if (code != HTTP_CODE_OK) {
-    lastError = "HTTP " + String(code);
-    logPrint("OTA", "Check failed: " + lastError);
-    return false;
+    logPrint("OTA", "Check HTTP " + String(code) + " - trying direct update");
+    return otaUpdateFromUrl(url);
   }
 
   if (payload.length() == 0) {
-    lastError = "Empty response";
-    return false;
+    logPrint("OTA", "Empty response - trying direct update");
+    return otaUpdateFromUrl(url);
   }
 
   // Check if response is JSON metadata
@@ -129,8 +138,14 @@ bool otaCheckNow() {
     }
     effectiveUrl = String(binUrl);
   } else {
-    // Plain URL response - treat as firmware URL directly
-    effectiveUrl = payload;
+    // Plain text URL response
+    String trimmed = payload;
+    trimmed.trim();
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      effectiveUrl = trimmed;
+    } else {
+      effectiveUrl = url;
+    }
   }
 
   logPrint("OTA", "Updating from: " + effectiveUrl);
@@ -141,16 +156,10 @@ bool otaUpdateFromUrl(const String &url) {
   lastError = "";
   logPrint("OTA", "Starting OTA update: " + url);
 
-  WiFiClient client;
-  WiFiClientSecure httpsClient;
-  t_httpUpdate_return ret;
+  WiFiClientSecure client;
+  client.setInsecure();
 
-  if (url.startsWith("https://")) {
-    httpsClient.setInsecure();
-    ret = ESPhttpUpdate.update(httpsClient, url, FIRMWARE_VERSION);
-  } else {
-    ret = ESPhttpUpdate.update(client, url, FIRMWARE_VERSION);
-  }
+  t_httpUpdate_return ret = ESPhttpUpdate.update(client, url, FIRMWARE_VERSION);
 
   switch (ret) {
     case HTTP_UPDATE_FAILED:

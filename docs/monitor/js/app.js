@@ -1614,7 +1614,7 @@ $('btn-ota-check').addEventListener('click', async () => {
     } else {
       const errMsg = data.error || 'up to date';
       showResult('ota-result', `No update: ${errMsg}`, 'success');
-      toast('Firmware is current', 'success');
+      toast(errMsg === 'up to date' ? 'Firmware is current' : errMsg, errMsg === 'up to date' ? 'success' : 'error');
     }
   } catch (err) {
     showResult('ota-result', `Check failed: ${err.message}`, 'error');
