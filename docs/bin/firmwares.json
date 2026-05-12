@@ -23,6 +23,12 @@
                           "url":  "wemos_d1_r1/v1.0.1_firmware.bin",
                           "version":  "1.0.1",
                           "board":  "wemos_d1_r1"
+                      },
+                      {
+                          "filename":  "v1.0.2_firmware.bin",
+                          "url":  "wemos_d1_r1/v1.0.2_firmware.bin",
+                          "version":  "1.0.2",
+                          "board":  "wemos_d1_r1"
                       }
                   ]
 }

@@ -10,4 +10,7 @@ bool otaUpdateFromUrl(const String &url);
 String otaLastError();
 unsigned long otaLastCheckMs();
 
+void arduinoOtaSetup();
+void arduinoOtaLoop();
+
 #endif

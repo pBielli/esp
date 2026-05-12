@@ -4,7 +4,7 @@
 #include "NTP.h"
 #include "GPIO.h"
 #include "DDNS.h"
-#include "Ping.h"
+#include "PingUtil.h"
 #include "WiFiManager.h"
 #include "OTA.h"
 #include <ESP8266WiFi.h>

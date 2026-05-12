@@ -26,13 +26,12 @@ void setup() {
 
   storageBegin();
   storageLoad();
-  networkListLoad();
-// storageReset();
   if (!storageInitialized()) {
     storageReset();
-    networkListSave();
+    networkListReset();
     logPrint("CONFIG", "reset to default");
   }
+  networkListLoad();
 
   pinMode(cfg.led_pin, OUTPUT);
   digitalWrite(cfg.led_pin, cfg.gpio_invert ? LOW : HIGH);
@@ -48,6 +47,7 @@ void setup() {
     logPrint("mDNS", String(cfg.mdns_name) + ".local");
   }
 
+  arduinoOtaSetup();
   setupRoutes();
   logPrint("SYS", "System started");
   lastCheck = millis();
@@ -57,6 +57,7 @@ void loop() {
   server.handleClient();
   MDNS.update();
   wifiLoop();
+  arduinoOtaLoop();
   otaLoop();
 
   static bool wifiWasConnected = false;

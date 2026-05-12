@@ -1,4 +1,4 @@
-#include "Ping.h"
+#include "PingUtil.h"
 #include <ESP8266WiFi.h>
 #include <ESP8266Ping.h>
 

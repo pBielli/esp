@@ -5,9 +5,47 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
+#include <ArduinoOTA.h>
 
 static unsigned long lastCheck = 0;
 static String lastError = "";
+
+// ── ArduinoOTA (push OTA via espota) ──────────────────────────
+void arduinoOtaSetup() {
+  ArduinoOTA.setHostname(cfg.mdns_name);
+  ArduinoOTA.setPassword(cfg.admin_password);
+
+  ArduinoOTA.onStart([]() {
+    logPrint("OTA", "ArduinoOTA: start");
+  });
+  ArduinoOTA.onEnd([]() {
+    logPrint("OTA", "ArduinoOTA: end");
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    static int lastPct = -1;
+    int pct = progress / (total / 100);
+    if (pct != lastPct) {
+      lastPct = pct;
+      logPrint("OTA", "ArduinoOTA: " + String(pct) + "%");
+    }
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    String msg = "ArduinoOTA: error ";
+    if (error == OTA_AUTH_ERROR) msg += "auth";
+    else if (error == OTA_BEGIN_ERROR) msg += "begin";
+    else if (error == OTA_CONNECT_ERROR) msg += "connect";
+    else if (error == OTA_RECEIVE_ERROR) msg += "receive";
+    else if (error == OTA_END_ERROR) msg += "end";
+    logPrint("OTA", msg);
+  });
+
+  ArduinoOTA.begin();
+  logPrint("OTA", "ArduinoOTA ready");
+}
+
+void arduinoOtaLoop() {
+  ArduinoOTA.handle();
+}
 
 void otaSetup() {
   lastCheck = 0;

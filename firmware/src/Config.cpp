@@ -123,6 +123,12 @@ void networkListLoad() {
   }
 }
 
+void networkListReset() {
+  nl.count = 0;
+  strncpy(nl.magic, "xx", 2);
+  networkListSave();
+}
+
 void networkListSave() {
   EEPROM.put(NETWORK_LIST_OFFSET, nl);
   EEPROM.commit();
