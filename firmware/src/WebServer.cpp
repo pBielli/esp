@@ -1,5 +1,6 @@
 #include "WebServer.h"
 #include "Config.h"
+#include "LED.h"
 #include "Logger.h"
 #include "NTP.h"
 #include "GPIO.h"
@@ -58,6 +59,7 @@ bool checkAuth() {
 }
 
 void sendCORS() {
+  ledWebPulse();
   server.sendHeader("Access-Control-Allow-Origin", CORS_ORIGIN);
   server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   server.sendHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");

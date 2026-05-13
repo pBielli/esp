@@ -24,10 +24,18 @@
 #define DEFAULT_DDNS_TOKEN     "3894523a-d53d-433d-b661-83ac156319fa"
 #define DEFAULT_DDNS_DOMAIN    "patbee"
 
+// ── Progetto (per OTA URL) ───────────────────────────────────
+#define DEFAULT_FIRMWARE_PROJECT "generic"
+#define DEFAULT_FIRMWARE_BOARD   "wemos_d1_r1"
+
 // ── Hardware ─────────────────────────────────────────────────
-#define DEFAULT_LED_PIN        2         // GPIO2 = LED blu su NodeMCU/D1 Mini
+#define DEFAULT_LED_PIN        2         // GPIO2 = LED blu su NodeMCU/D1 Mini (legacy)
 #define DEFAULT_GPIO_INVERT    1         // 1 = logica invertita (LED attivo LOW)
 #define DEFAULT_PWM_PIN        5         // GPIO5 = D1 su NodeMCU
+#define DEFAULT_LED_RUN_PIN    2         // GPIO2 = LED heartbeat (stesso del legacy)
+#define DEFAULT_LED_WIFI_PIN   5         // GPIO5 = LED stato WiFi
+#define DEFAULT_LED_OTA_PIN    16        // GPIO16 = LED durante OTA (-1 = disabilitato)
+#define DEFAULT_LED_WEB_PIN    14        // GPIO14 = LED richiesta web
 
 // ── NTP ──────────────────────────────────────────────────────
 #define DEFAULT_NTP_SERVER     "pool.ntp.org"

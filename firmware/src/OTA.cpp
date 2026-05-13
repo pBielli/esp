@@ -1,5 +1,6 @@
 #include "OTA.h"
 #include "Config.h"
+#include "LED.h"
 #include "Logger.h"
 #include <ArduinoJson.h>
 #include <ESP8266WiFi.h>
@@ -69,8 +70,8 @@ bool otaCheckNow() {
 
   String url = String(cfg.ota_url);
   if (url.length() == 0) {
-    lastError = "No OTA URL configured";
-    return false;
+    url = otaDefaultUrl();
+    logPrint("OTA", "Using default URL: " + url);
   }
 
   logPrint("OTA", "Checking: " + url);
@@ -156,10 +157,14 @@ bool otaUpdateFromUrl(const String &url) {
   lastError = "";
   logPrint("OTA", "Starting OTA update: " + url);
 
+  ledOtaSet(true);
+
   WiFiClientSecure client;
   client.setInsecure();
 
   t_httpUpdate_return ret = ESPhttpUpdate.update(client, url, FIRMWARE_VERSION);
+
+  ledOtaSet(false);
 
   switch (ret) {
     case HTTP_UPDATE_FAILED:

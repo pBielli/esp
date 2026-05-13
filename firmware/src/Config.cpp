@@ -57,6 +57,10 @@ void storageReset() {
   strncpy(cfg.ota_url,         DEFAULT_OTA_URL,        sizeof(cfg.ota_url) - 1);
   cfg.ota_check_interval   = DEFAULT_OTA_INTERVAL;
   cfg.wifi_retry_count     = DEFAULT_WIFI_RETRY;
+  cfg.led_run_pin          = DEFAULT_LED_RUN_PIN;
+  cfg.led_wifi_pin         = DEFAULT_LED_WIFI_PIN;
+  cfg.led_ota_pin          = DEFAULT_LED_OTA_PIN;
+  cfg.led_web_pin          = DEFAULT_LED_WEB_PIN;
   storageSave();
 }
 
@@ -105,6 +109,10 @@ bool validateNetworkConfig() {
     return false;
   }
   return true;
+}
+
+String otaDefaultUrl() {
+  return "https://pbielli.github.io/esp/bin/" + String(FIRMWARE_BOARD) + "/" + String(FIRMWARE_PROJECT) + "/v" + String(FIRMWARE_VERSION) + "_firmware.bin";
 }
 
 // ── NetworkList ─────────────────────────────────────────────

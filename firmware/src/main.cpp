@@ -9,6 +9,7 @@
 #include <time.h>
 
 #include "Config.h"
+#include "LED.h"
 #include "Logger.h"
 #include "NTP.h"
 #include "GPIO.h"
@@ -18,6 +19,7 @@
 #include "WebServer.h"
 
 unsigned long lastCheck = 0;
+unsigned long lastLedToggle = 0;
 bool flag_firstRun = true;
 
 void setup() {
@@ -32,6 +34,8 @@ void setup() {
     logPrint("CONFIG", "reset to default");
   }
   networkListLoad();
+
+  ledSetup();
 
   pinMode(cfg.led_pin, OUTPUT);
   digitalWrite(cfg.led_pin, cfg.gpio_invert ? LOW : HIGH);
@@ -54,20 +58,28 @@ void setup() {
 }
 
 void loop() {
+  ledLoop();
   server.handleClient();
   MDNS.update();
   wifiLoop();
   arduinoOtaLoop();
   otaLoop();
 
+  if (millis() - lastLedToggle >= 1000) {
+    lastLedToggle = millis();
+    ledRunToggle();
+  }
+
   static bool wifiWasConnected = false;
   if (WiFi.status() == WL_CONNECTED && !wifiWasConnected) {
     wifiWasConnected = true;
+    ledWifiSet(true);
     logPrint("WIFI", "Connected: " + WiFi.localIP().toString());
     applyNetworkConfig();
     validateNetworkConfig();
   } else if (WiFi.status() != WL_CONNECTED) {
     wifiWasConnected = false;
+    ledWifiSet(false);
   }
 
   if (millis() - lastCheck > (unsigned long)cfg.ddns_check_interval * 1000 || flag_firstRun) {

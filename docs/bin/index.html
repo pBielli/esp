@@ -38,29 +38,35 @@ async function load() {
   const data = await res.json();
   const groups = {};
   data.firmwares.forEach(fw => {
-    if (!groups[fw.board]) groups[fw.board] = [];
-    groups[fw.board].push(fw);
+    const key = fw.project || 'unknown';
+    if (!groups[key]) groups[key] = {};
+    if (!groups[key][fw.board]) groups[key][fw.board] = [];
+    groups[key][fw.board].push(fw);
   });
   const root = document.getElementById('root');
   const base = location.pathname.replace(/\/[^/]*$/, '/');
-  Object.entries(groups).forEach(([board, list]) => {
-    const boardDiv = document.createElement('div');
-    boardDiv.className = 'board';
-    boardDiv.innerHTML = `
-      <div class="board-header"><span class="icon">&#x1f527;</span> ${board}</div>
-      <table><thead><tr><th>Versione</th><th>Azioni</th></tr></thead><tbody>
-        ${list.sort((a,b)=>b.version.localeCompare(a.version,void 0,{numeric:true})).map(fw => `
+  Object.entries(groups).forEach(([project, boards]) => {
+    const projDiv = document.createElement('div');
+    projDiv.className = 'board';
+    projDiv.innerHTML = `<div class="board-header"><span class="icon">&#x1f4e6;</span> ${project}</div>`;
+    const table = document.createElement('table');
+    table.innerHTML = '<thead><tr><th>Board</th><th>Versione</th><th>Azioni</th></tr></thead><tbody>';
+    Object.entries(boards).forEach(([board, list]) => {
+      list.sort((a,b)=>b.version.localeCompare(a.version,void 0,{numeric:true})).forEach((fw, i) => {
+        table.innerHTML += `
           <tr>
+            ${i === 0 ? `<td rowspan="${list.length}" style="font-weight:600;">${board}</td>` : ''}
             <td class="version">v${fw.version}</td>
             <td class="actions">
               <a class="btn btn-primary" href="${fw.url}" target="_blank">&#x2b06; Scarica</a>
               <button class="btn" onclick="copyUrl('${base}${fw.url}')">&#x1f4cb; Copia URL</button>
             </td>
-          </tr>
-        `).join('')}
-      </tbody></table>
-    `;
-    root.appendChild(boardDiv);
+          </tr>`;
+      });
+    });
+    table.innerHTML += '</tbody>';
+    projDiv.appendChild(table);
+    root.appendChild(projDiv);
   });
 }
 
