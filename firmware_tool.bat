@@ -21,7 +21,7 @@ echo.
 echo  1. Build firmware (%PIOENV%)
 echo  2. Copy firmware to docs/
 echo  3. Push to GitHub
-echo  4. Full auto: incr ^> build ^> copy ^> push ^> verify
+echo  4. Full auto: flash ^> incr ^> build ^> copy ^> push ^> verify
 echo  5. Exit
 echo.
 set /p "CH=Seleziona [1-5]: "
@@ -73,6 +73,21 @@ REM Leggi versione corrente
 for /f "tokens=3" %%a in ('findstr /b /c:"#define FIRMWARE_VERSION" firmware\include\Config.h') do set "CUR_VER=%%~a"
 if "!CUR_VER!"=="" ( echo ERRORE: versione non trovata & pause & exit /b 1 )
 echo Versione corrente: !CUR_VER!
+
+REM Step 0: USB flash del firmware ATTUALE (garantisce OTA logic corretta sulla scheda)
+echo.
+echo [0/4] Flash USB del firmware v!CUR_VER! su %MONITOR_PORT%...
+pushd "%PIO_DIR%"
+"%PIO%" run -e %PIOENV% -t upload --upload-port %MONITOR_PORT%
+set "FLASH_ERR=%errorlevel%"
+popd
+if !FLASH_ERR! neq 0 (
+    echo [ERRORE] Flash USB fallito — la scheda e' connessa su %MONITOR_PORT%?
+    pause
+    exit /b 1
+)
+echo [0/4] Flash USB completato (v!CUR_VER!).
+echo.
 
 REM Incrementa patch
 for /f "tokens=1-3 delims=." %%a in ("!CUR_VER!") do (
