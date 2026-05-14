@@ -112,7 +112,7 @@ bool validateNetworkConfig() {
 }
 
 String otaDefaultUrl() {
-  return "https://pbielli.github.io/esp/bin/" + String(FIRMWARE_BOARD) + "/" + String(FIRMWARE_PROJECT) + "/v" + String(FIRMWARE_VERSION) + "_firmware.bin";
+  return "https://pbielli.github.io/esp/bin/" + String(FIRMWARE_BOARD) + "/" + String(FIRMWARE_PROJECT) + "/latest";
 }
 
 // ── NetworkList ─────────────────────────────────────────────

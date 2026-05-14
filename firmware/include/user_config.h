@@ -47,7 +47,7 @@
 
 // ── OTA ──────────────────────────────────────────────────────
 #define DEFAULT_OTA_URL        ""        // URL JSON o .bin diretto
-#define DEFAULT_OTA_INTERVAL   0         // 0 = disabilitato
+#define DEFAULT_OTA_INTERVAL   300       // secondi (0 = disabilitato)
 
 // ── Tentativi WiFi ───────────────────────────────────────────
 #define DEFAULT_WIFI_RETRY     2

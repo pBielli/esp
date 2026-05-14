@@ -78,7 +78,7 @@ bool otaCheckNow() {
 
   String effectiveUrl = url;
 
-  // If URL ends with .bin, skip HTTP check and try update directly
+  // Direct update for binary URLs (skip metadata fetch entirely)
   if (url.endsWith(".bin")) {
     logPrint("OTA", "Direct binary URL, updating");
     return otaUpdateFromUrl(url);
@@ -109,37 +109,42 @@ bool otaCheckNow() {
   http.end();
 
   if (code != HTTP_CODE_OK) {
-    logPrint("OTA", "Check HTTP " + String(code) + " - trying direct update");
-    return otaUpdateFromUrl(url);
+    lastError = "Check HTTP " + String(code) + " - check failed";
+    logPrint("OTA", lastError);
+    return false;
   }
 
   if (payload.length() == 0) {
-    logPrint("OTA", "Empty response - trying direct update");
-    return otaUpdateFromUrl(url);
+    lastError = "Empty metadata response";
+    logPrint("OTA", lastError);
+    return false;
   }
 
-  // Check if response is JSON metadata
-  if (payload.startsWith("{")) {
+  // Try JSON metadata first (ArduinoJson handles BOM/surrounding whitespace)
+  {
     DynamicJsonDocument doc(512);
     DeserializationError err = deserializeJson(doc, payload);
-    if (err) {
-      lastError = "Invalid JSON metadata";
+    if (!err) {
+      const char* version = doc["version"];
+      const char* binUrl = doc["url"];
+      if (binUrl && strlen(binUrl) > 0) {
+        if (version && strcmp(version, FIRMWARE_VERSION) == 0) {
+          logPrint("OTA", "Version matches: " + String(version));
+          lastError = "Already up to date";
+          return true;
+        }
+        effectiveUrl = String(binUrl);
+        logPrint("OTA", "Updating from: " + effectiveUrl);
+        return otaUpdateFromUrl(effectiveUrl);
+      }
+      lastError = "No firmware URL in JSON metadata";
+      logPrint("OTA", lastError);
       return false;
     }
-    const char* version = doc["version"];
-    const char* binUrl = doc["url"];
-    if (!binUrl || strlen(binUrl) == 0) {
-      lastError = "No firmware URL in metadata";
-      return false;
-    }
-    if (version && strcmp(version, FIRMWARE_VERSION) == 0) {
-      logPrint("OTA", "Version matches: " + String(version));
-      lastError = "Already up to date";
-      return true;
-    }
-    effectiveUrl = String(binUrl);
-  } else {
-    // Plain text URL response
+  }
+
+  // Fallback: plain text URL response
+  {
     String trimmed = payload;
     trimmed.trim();
     if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
@@ -155,31 +160,77 @@ bool otaCheckNow() {
 
 bool otaUpdateFromUrl(const String &url) {
   lastError = "";
-  logPrint("OTA", "Starting OTA update: " + url);
 
   ledOtaSet(true);
 
-  WiFiClientSecure client;
-  client.setInsecure();
+  HTTPClient http;
+  http.setTimeout(30000);
+  http.setUserAgent("ESP8266-OTA/1.0");
+  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
 
-  t_httpUpdate_return ret = ESPhttpUpdate.update(client, url, FIRMWARE_VERSION);
+  WiFiClientSecure httpsClient;
+  WiFiClient plainClient;
+  if (url.startsWith("https://")) {
+    httpsClient.setInsecure();
+    http.begin(httpsClient, url);
+  } else {
+    http.begin(plainClient, url);
+  }
 
+  int code = http.GET();
+  if (code != HTTP_CODE_OK) {
+    lastError = "OTA: HTTP GET failed: " + String(code);
+    logPrint("OTA", lastError);
+    http.end();
+    ledOtaSet(false);
+    return false;
+  }
+
+  int totalSize = http.getSize();
+  if (totalSize <= 0) {
+    lastError = "OTA: Invalid size: " + String(totalSize);
+    logPrint("OTA", lastError);
+    http.end();
+    ledOtaSet(false);
+    return false;
+  }
+
+  logPrint("OTA", "Downloading " + String(totalSize) + " bytes");
+
+  WiFiClient *stream = http.getStreamPtr();
+
+  if (!Update.begin(totalSize)) {
+    lastError = "OTA: Update.begin: " + String(Update.getError());
+    logPrint("OTA", lastError);
+    http.end();
+    ledOtaSet(false);
+    return false;
+  }
+
+  size_t written = Update.writeStream(*stream);
+  if (written != (size_t)totalSize) {
+    lastError = "OTA: Written " + String(written) + "/" + String(totalSize);
+    logPrint("OTA", lastError);
+    http.end();
+    ledOtaSet(false);
+    return false;
+  }
+
+  if (!Update.end()) {
+    lastError = "OTA: Update.end: " + String(Update.getError());
+    logPrint("OTA", lastError);
+    http.end();
+    ledOtaSet(false);
+    return false;
+  }
+
+  http.end();
   ledOtaSet(false);
 
-  switch (ret) {
-    case HTTP_UPDATE_FAILED:
-      lastError = "Update failed: " + ESPhttpUpdate.getLastErrorString();
-      logPrint("OTA", lastError);
-      return false;
-    case HTTP_UPDATE_NO_UPDATES:
-      lastError = "No update available";
-      logPrint("OTA", "No update available");
-      return false;
-    case HTTP_UPDATE_OK:
-      logPrint("OTA", "Update OK - rebooting");
-      return true;
-  }
-  return false;
+  logPrint("OTA", "Update OK - rebooting");
+  delay(500);
+  ESP.restart();
+  return true;
 }
 
 String otaLastError() {
