@@ -1,30 +1,24 @@
 ﻿#ifndef CONFIG_H
 #define CONFIG_H
-
 #include <EEPROM.h>
 #include <Arduino.h>
-
 #define EEPROM_SIZE 4096
 #define MAGIC "DDC"
 #define CORS_ORIGIN "https://pbielli.github.io"
-#define FIRMWARE_VERSION "1.0.8"
+#define FIRMWARE_VERSION "1.0.9"
 #define FIRMWARE_PROJECT DEFAULT_FIRMWARE_PROJECT
 #define FIRMWARE_BOARD   DEFAULT_FIRMWARE_BOARD
-
 #define MAX_NETWORKS 4
 #define NETWORK_LIST_OFFSET 2048
-
 struct WifiNetwork {
   char ssid[33];
   char password[65];
 };
-
 struct NetworkList {
   char magic[5];
   int count;
   WifiNetwork networks[MAX_NETWORKS];
 };
-
 struct Config {
   char wifi_ssid[32];
   char wifi_password[64];
@@ -60,9 +54,7 @@ struct Config {
   int led_web_pin;
   char magic[4];
 };
-
 extern Config cfg;
-
 void storageBegin();
 void storageLoad();
 void storageSave();
@@ -70,7 +62,6 @@ void storageReset();
 bool storageInitialized();
 void applyNetworkConfig();
 bool validateNetworkConfig();
-
 void networkListLoad();
 void networkListSave();
 void networkListReset();
@@ -80,8 +71,5 @@ bool networkListGet(int idx, WifiNetwork &net);
 bool networkListAdd(const char *ssid, const char *password);
 bool networkListRemove(int idx);
 bool networkListMove(int from, int to);
-
 String otaDefaultUrl();
-
 #endif
-
