@@ -114,12 +114,13 @@ bool otaCheckNow() {
   WiFiClientSecure httpsClient;
   bool isHttps = url.startsWith("https://");
 
+  String useUrl = url;
   if (isHttps) {
-    httpsClient.setBufferSizes(512, 512);
+    httpsClient.setBufferSizes(2048, 512);
     httpsClient.setInsecure();
-    http.begin(httpsClient, url);
+    http.begin(httpsClient, useUrl);
   } else {
-    http.begin(client, url);
+    http.begin(client, useUrl);
   }
 
   String payload;

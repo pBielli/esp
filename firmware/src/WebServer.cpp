@@ -999,6 +999,7 @@ void setupRoutes() {
     if (!checkAuth()) return;
     String url = server.arg("url");
     String interval = server.arg("interval");
+    cfg.ota_url[0] = '\0';
     if (url != "") strncpy(cfg.ota_url, url.c_str(), sizeof(cfg.ota_url) - 1);
     if (interval != "") cfg.ota_check_interval = interval.toInt();
     storageSave();
