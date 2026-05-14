@@ -69,108 +69,110 @@ echo.
 echo ===== FULL AUTO =====
 echo.
 
-REM Leggi versione corrente
+REM ── Step pre: leggi versione corrente ──
 for /f "tokens=3" %%a in ('findstr /b /c:"#define FIRMWARE_VERSION" firmware\include\Config.h') do set "CUR_VER=%%~a"
 if "!CUR_VER!"=="" ( echo ERRORE: versione non trovata & pause & exit /b 1 )
 echo Versione corrente: !CUR_VER!
 
-REM Step 0: USB flash del firmware ATTUALE (garantisce OTA logic corretta sulla scheda)
+REM ── Step 0: USB flash del firmware ATTUALE ──
 echo.
-echo [0/4] Flash USB del firmware v!CUR_VER! su %MONITOR_PORT%...
+echo [0/5] Flash USB del firmware v!CUR_VER! su %MONITOR_PORT%...
 pushd "%PIO_DIR%"
 "%PIO%" run -e %PIOENV% -t upload --upload-port %MONITOR_PORT%
 set "FLASH_ERR=%errorlevel%"
 popd
 if !FLASH_ERR! neq 0 (
-    echo [ERRORE] Flash USB fallito — la scheda e' connessa su %MONITOR_PORT%?
-    pause
-    exit /b 1
+    echo [ERRORE] Flash USB fallito
+    pause & exit /b 1
 )
-echo [0/4] Flash USB completato (v!CUR_VER!).
+echo [0/5] Flash USB completato (v!CUR_VER!).
 echo.
 
-REM Incrementa patch
+REM ── Step 1: incrementa versione ──
 for /f "tokens=1-3 delims=." %%a in ("!CUR_VER!") do (
     set /a "NEW_PATCH=%%c+1"
     set "NEW_VER=%%a.%%b.!NEW_PATCH!"
 )
-echo Nuova versione: !NEW_VER!
+echo [1/5] Nuova versione: !NEW_VER!
 
-REM Riscrivi Config.h
-powershell -ExecutionPolicy Bypass -Command ^
-"(Get-Content 'firmware\include\Config.h') -replace '#define FIRMWARE_VERSION \"[^\"]+\"','#define FIRMWARE_VERSION \"!NEW_VER!\"' | Set-Content 'firmware\include\Config.h' -Encoding UTF8"
+REM Riscrivi solo la riga FIRMWARE_VERSION in Config.h
+set "TMP_FILE=%TEMP%\Config_%RANDOM%.h"
+(
+    for /f "usebackq delims=" %%a in ("firmware\include\Config.h") do (
+        set "LINE=%%a"
+        if "!LINE:#define FIRMWARE_VERSION=!"=="!LINE!" (
+            echo(!LINE!
+        ) else (
+            echo #define FIRMWARE_VERSION "!NEW_VER!"
+        )
+    )
+) > "!TMP_FILE!"
+move /Y "!TMP_FILE!" "firmware\include\Config.h" >nul
 if %errorlevel% neq 0 ( echo ERRORE aggiornamento versione & pause & exit /b 1 )
-echo [1/4] Versione aggiornata a !NEW_VER!.
+echo [1/5] Versione aggiornata a !NEW_VER!.
 
-REM Build
-echo [2/4] Compilazione...
+REM ── Step 2: build ──
+echo [2/5] Compilazione...
 pushd "%PIO_DIR%"
 "%PIO%" run -e %PIOENV%
 set "BUILD_ERR=%errorlevel%"
 popd
 if %BUILD_ERR% neq 0 ( echo ERRORE build & pause & exit /b 1 )
-echo [2/4] Build completato.
+echo [2/5] Build completato.
 
-REM Copy
-echo [3/4] Copia firmware...
+REM ── Step 3: copy ──
+echo [3/5] Copia firmware...
 call copy_firmware.bat
 if %errorlevel% neq 0 ( echo ERRORE copy & pause & exit /b 1 )
-echo [3/4] Copia completata.
+echo [3/5] Copia completata.
 
-REM Push
-echo [4/4] Push su GitHub...
+REM ── Step 4: push ──
+echo [4/5] Push su GitHub...
 git add .
 git commit -m "firmware v!NEW_VER!"
 git push -u origin %GH_BRANCH%
 if %errorlevel% neq 0 ( echo ERRORE push & pause & exit /b 1 )
-echo [4/4] Push completato.
+echo [4/5] Push completato.
 
-REM Avvia serial monitor in finestra separata
+REM ── Step 5: verifica + serial monitor inline ──
+echo [5/5] Verifica GitHub Pages + serial monitor
 echo.
-echo Avvio serial monitor su %MONITOR_PORT% (baud %MONITOR_BAUD%)...
-start "Serial Monitor" cmd /c ""%PIO%" device monitor --port %MONITOR_PORT% --baud %MONITOR_BAUD% & pause"
-echo.
-
-REM Wait for GitHub Pages update
-echo ===== Verifica GitHub Pages =====
-echo Attendo che la versione !NEW_VER! sia disponibile su:
-echo %ROOT_URL%/generic/%PIOENV%/info.json
-echo.
-echo Premere CTRL+C per interrompere la verifica.
+echo Premere CTRL+C per interrompere.
 echo.
 
 set "INFO_URL=%ROOT_URL%/generic/%PIOENV%/info.json"
-set "WAIT_SEC=60"
-set "ATTEMPTS=30"
+set "WAIT_SEC=30"
+set "ATTEMPTS=20"
+
+REM Configura porta seriale
+mode %MONITOR_PORT%: BAUD=%MONITOR_BAUD% PARITY=N DATA=8 STOP=1 >nul 2>&1
 
 :verify_loop
-echo [%date% %time%] Verifico...
-for /f "usebackq delims=" %%r in (`powershell -ExecutionPolicy Bypass -Command "try { $r = Invoke-WebRequest -Uri '%INFO_URL%' -UseBasicParsing -TimeoutSec 30; Write-Output $r.Content } catch { Write-Output '' }"`) do set "BODY=%%r"
 
-if "!BODY!"=="" (
-    echo   Risposta vuota o errore — riprovo tra !WAIT_SEC!s
-) else (
-    echo   Risposta: !BODY!
+REM Legge seriale inline (output recente della scheda)
+for /f "delims=" %%s in ('powershell -NoP -C "try{$p=New-Object IO.Ports.SerialPort %MONITOR_PORT%,%MONITOR_BAUD%,None,8,One;$p.Open();$p.ReadTimeout=800;while(($s=$p.ReadLine())-ne$null){Write-Output $s}}catch{}" 2^>nul') do (
+    echo [SCHEDA] %%s
+)
+
+REM Verifica GitHub Pages
+for /f "usebackq delims=" %%r in (`powershell -NoP -C "try{$r=Invoke-WebRequest -Uri '%INFO_URL%' -UseBasicParsing -TimeoutSec 30;Write-Output $r.Content}catch{}" 2^>nul`) do set "BODY=%%r"
+
+if not "!BODY!"=="" (
+    echo [OTA] !BODY!
     echo !BODY! | findstr "!NEW_VER!" >nul
     if !errorlevel! equ 0 (
         echo.
         echo ===== SUCCESSO — Versione !NEW_VER! rilevata su GitHub Pages =====
-        echo.
         echo OTA URL: %INFO_URL%
         echo.
-        echo Il serial monitor e' aperto in un'altra finestra.
-        echo Chiudilo manualmente quando hai finito.
         pause
         goto menu
-    ) else (
-        echo   Versione !NEW_VER! non ancora presente — riprovo tra !WAIT_SEC!s
     )
 )
 
 set /a "ATTEMPTS-=1"
 if !ATTEMPTS! leq 0 (
-    echo.
-    echo ===== TIMEOUT — !NEW_VER! non rilevata dopo 30 tentativi =====
+    echo ===== TIMEOUT — !NEW_VER! non rilevata dopo 20 tentativi =====
     pause
     goto menu
 )
