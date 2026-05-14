@@ -25,6 +25,21 @@ bool flag_firstRun = true;
 void setup() {
   Serial.begin(115200);
   Serial.println("\n");
+  Serial.print("Board: ");
+  Serial.print(FIRMWARE_BOARD);
+  Serial.print("  Project: ");
+  Serial.print(FIRMWARE_PROJECT);
+  Serial.print("  FW: ");
+  Serial.println(FIRMWARE_VERSION);
+  Serial.println("Startup");
+  Serial.print("Chip ID: 0x");
+  Serial.println(ESP.getChipId(), HEX);
+  Serial.print("Flash: ");
+  Serial.print(ESP.getFlashChipRealSize() / 1024);
+  Serial.println("KB");
+  Serial.print("Free heap: ");
+  Serial.print(ESP.getFreeHeap());
+  Serial.println(" bytes");
 
   storageBegin();
   storageLoad();
@@ -53,6 +68,7 @@ void setup() {
 
   arduinoOtaSetup();
   setupRoutes();
+  logPrint("SYS", String("Board: ") + FIRMWARE_BOARD + " Project: " + FIRMWARE_PROJECT + " FW: " + FIRMWARE_VERSION);
   logPrint("SYS", "System started");
   lastCheck = millis();
 }

@@ -2,30 +2,44 @@
     "firmwares":  [
                       {
                           "filename":  "v1.0.2_firmware.bin",
-                          "url":  "wemos_d1_r1/generic/v1.0.2_firmware.bin",
+                          "url":  "generic/wemos_d1_r1/v1.0.2_firmware.bin",
                           "project":  "generic",
                           "version":  "1.0.2",
                           "board":  "wemos_d1_r1"
                       },
                       {
                           "filename":  "v1.0.3_firmware.bin",
-                          "url":  "wemos_d1_r1/generic/v1.0.3_firmware.bin",
+                          "url":  "generic/wemos_d1_r1/v1.0.3_firmware.bin",
                           "project":  "generic",
                           "version":  "1.0.3",
                           "board":  "wemos_d1_r1"
                       },
                       {
                           "filename":  "v1.0.4_firmware.bin",
-                          "url":  "wemos_d1_r1/generic/v1.0.4_firmware.bin",
+                          "url":  "generic/wemos_d1_r1/v1.0.4_firmware.bin",
                           "project":  "generic",
                           "version":  "1.0.4",
                           "board":  "wemos_d1_r1"
                       },
                       {
                           "filename":  "v1.0.5_firmware.bin",
-                          "url":  "wemos_d1_r1/generic/v1.0.5_firmware.bin",
+                          "url":  "generic/wemos_d1_r1/v1.0.5_firmware.bin",
                           "project":  "generic",
                           "version":  "1.0.5",
+                          "board":  "wemos_d1_r1"
+                      },
+                      {
+                          "filename":  "v1.0.6_firmware.bin",
+                          "url":  "generic/wemos_d1_r1/v1.0.6_firmware.bin",
+                          "project":  "generic",
+                          "version":  "1.0.6",
+                          "board":  "wemos_d1_r1"
+                      },
+                      {
+                          "filename":  "v1.0.7_firmware.bin",
+                          "url":  "generic/wemos_d1_r1/v1.0.7_firmware.bin",
+                          "project":  "generic",
+                          "version":  "1.0.7",
                           "board":  "wemos_d1_r1"
                       }
                   ]

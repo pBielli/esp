@@ -16,19 +16,19 @@ REM Scansiona firmware\.pio\build\ per firmware.bin
 for /d %%d in (firmware\.pio\build\*) do (
     if exist "%%d\firmware.bin" (
         set "BD=%%~nxd"
-        set "DEST=docs\bin\!BD!\%PROJECT%"
+        set "DEST=docs\bin\%PROJECT%\!BD!"
         if not exist "!DEST!" mkdir "!DEST!"
         copy "%%d\firmware.bin" "!DEST!\v%VER%_firmware.bin" >nul
         echo Copiato: %%d\firmware.bin -^> !DEST!\v%VER%_firmware.bin
 
-        REM Genera file latest (JSON senza estensione) nella cartella progetto
-        powershell -ExecutionPolicy Bypass -Command "$url='https://pbielli.github.io/esp/bin/!BD!/%PROJECT%/v%VER%_firmware.bin'; @{version='%VER%';url=$url;board='!BD!';project='%PROJECT%'} | ConvertTo-Json -Compress | Set-Content '!DEST!\latest' -Encoding UTF8"
-        echo Generato: !DEST!\latest
+        REM Genera file info.json nella cartella progetto/board
+        powershell -ExecutionPolicy Bypass -Command "$url='https://pbielli.github.io/esp/bin/%PROJECT%/!BD!/v%VER%_firmware.bin'; @{version='%VER%';url=$url;board='!BD!';project='%PROJECT%'} | ConvertTo-Json -Compress | Set-Content '!DEST!\info.json' -Encoding UTF8"
+        echo Generato: !DEST!\info.json
     )
 )
 
-REM Genera firmwares.json (con progetto)
+REM Genera firmwares.json (nuovo ordine: project/board/)
 echo Generazione firmwares.json...
-powershell -ExecutionPolicy Bypass -Command "$firmwares = @(); Get-ChildItem 'docs\bin\*' -Directory | ForEach-Object { $board = $_.Name; Get-ChildItem $_.FullName -Directory | ForEach-Object { $project = $_.Name; Get-ChildItem ('{0}\*.bin' -f $_.FullName) | ForEach-Object { $filename = $_.Name; $version = $filename -replace '^v(.*)_firmware\.bin$','$1'; $firmwares += @{board=$board;project=$project;version=$version;filename=$filename;url=($board+'/'+$project+'/'+$filename)} } } }; @{firmwares=$firmwares} | ConvertTo-Json -Depth 3 | Set-Content 'docs\bin\firmwares.json' -Encoding UTF8"
+powershell -ExecutionPolicy Bypass -Command "$firmwares = @(); Get-ChildItem 'docs\bin\*' -Directory | Where-Object { $_.Name -ne 'index.html' } | ForEach-Object { $project = $_.Name; Get-ChildItem $_.FullName -Directory | ForEach-Object { $board = $_.Name; Get-ChildItem ('{0}\*.bin' -f $_.FullName) | ForEach-Object { $filename = $_.Name; $version = $filename -replace '^v(.*)_firmware\.bin$','$1'; $firmwares += @{project=$project;board=$board;version=$version;filename=$filename;url=($project+'/'+$board+'/'+$filename)} } } }; @{firmwares=$firmwares} | ConvertTo-Json -Depth 3 | Set-Content 'docs\bin\firmwares.json' -Encoding UTF8"
 
 echo Fatto.

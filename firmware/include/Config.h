@@ -1,4 +1,4 @@
-#ifndef CONFIG_H
+﻿#ifndef CONFIG_H
 #define CONFIG_H
 
 #include <EEPROM.h>
@@ -7,7 +7,7 @@
 #define EEPROM_SIZE 4096
 #define MAGIC "DDC"
 #define CORS_ORIGIN "https://pbielli.github.io"
-#define FIRMWARE_VERSION "1.0.5"
+#define FIRMWARE_VERSION "1.0.7"
 #define FIRMWARE_PROJECT DEFAULT_FIRMWARE_PROJECT
 #define FIRMWARE_BOARD   DEFAULT_FIRMWARE_BOARD
 
